@@ -53,16 +53,19 @@ export function Sidebar({ userName }: { userName: string }) {
   return (
     <>
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 flex items-center justify-between px-4 h-14">
-        <div className="flex items-center gap-2">
-          <div className="bg-emerald-500 text-white rounded-lg p-1.5">
-            <TrendingUp className="w-4 h-4" />
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 flex flex-col">
+        <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-500 text-white rounded-lg p-1.5">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <span className="font-bold text-gray-900">WiseFlow</span>
           </div>
-          <span className="font-bold text-gray-900">WiseFlow</span>
+          <button onClick={() => setOpen(!open)} className="p-2">
+            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
-        <button onClick={() => setOpen(!open)} className="p-2">
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
       </header>
 
       {/* Mobile overlay */}
@@ -81,7 +84,10 @@ export function Sidebar({ userName }: { userName: string }) {
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="flex items-center gap-2 px-4 h-14 border-b border-gray-200">
+        <div
+          className="flex items-center gap-2 px-4 h-14 border-b border-gray-200 flex-shrink-0"
+          style={{ paddingTop: "env(safe-area-inset-top, 0px)", height: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
+        >
           <div className="bg-emerald-500 text-white rounded-lg p-1.5">
             <TrendingUp className="w-4 h-4" />
           </div>
@@ -104,8 +110,6 @@ export function Sidebar({ userName }: { userName: string }) {
         </div>
       </aside>
 
-      {/* Mobile top padding */}
-      <div className="lg:hidden h-14" />
     </>
   );
 }
