@@ -11,14 +11,17 @@ export async function GET(req: NextRequest) {
   const mesBase = Number(searchParams.get("mes") ?? new Date().getMonth() + 1);
   const anoBase = Number(searchParams.get("ano") ?? new Date().getFullYear());
 
-  const [receitas, despesasFixas, despesasVariaveis] = await Promise.all([
-    prisma.receita.findMany({ where: { userId: session.user.id } }),
+  const [receitas, despesasFixas, despesasVariaveis, contasBancarias] = await Promise.all([
+    prisma.receita.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
+    prisma.contaBancaria.findMany({ where: { userId: session.user.id } }),
   ]);
 
+  const saldoBancario = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
+
   const projecao = [];
-  let psiAcumulado = 0;
+  let psiAcumulado = saldoBancario;
 
   for (let i = 0; i < 12; i++) {
     let mes = mesBase + i;
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     const totalReceitas = receitas
       .filter((r) => {
-        if (r.recorrente && r.ativa) return true;
+        if (r.recorrente) return new Date(r.data) <= fim;
         const data = new Date(r.data);
         return data >= inicio && data <= fim;
       })
@@ -69,5 +72,5 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json(projecao);
+  return NextResponse.json({ projecao, saldoBancario });
 }
