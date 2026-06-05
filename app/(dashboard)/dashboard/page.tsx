@@ -69,7 +69,13 @@ export default function DashboardPage() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <StatCard
-              title="Total Receitas"
+              title="Saldo em Contas"
+              value={data?.saldoBancario ?? 0}
+              icon={<Landmark className="w-6 h-6" />}
+              color={(data?.saldoBancario ?? 0) >= 0 ? "teal" : "orange"}
+            />
+            <StatCard
+              title="Receitas Pendentes"
               value={data?.totalReceitas ?? 0}
               icon={<TrendingUp className="w-6 h-6" />}
               color="emerald"
@@ -81,16 +87,10 @@ export default function DashboardPage() {
               color="red"
             />
             <StatCard
-              title="PSI (Saldo Líquido)"
+              title="PSI (Previsão)"
               value={data?.psi ?? 0}
               icon={<Wallet className="w-6 h-6" />}
               color={(data?.psi ?? 0) >= 0 ? "blue" : "orange"}
-            />
-            <StatCard
-              title="Saldo em Contas"
-              value={data?.saldoBancario ?? 0}
-              icon={<Landmark className="w-6 h-6" />}
-              color={(data?.saldoBancario ?? 0) >= 0 ? "teal" : "orange"}
             />
           </div>
 
@@ -132,12 +132,13 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-700 mb-4">Resumo</h3>
               <div className="space-y-3">
-                <Row label="Receitas" value={data?.totalReceitas ?? 0} positive />
+                <Row label="Saldo em Contas" value={data?.saldoBancario ?? 0} positive />
+                <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
                 <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
                 <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
                 <div className="border-t pt-3">
                   <Row
-                    label="PSI"
+                    label="PSI (Previsão)"
                     value={data?.psi ?? 0}
                     bold
                     positive={(data?.psi ?? 0) >= 0}

@@ -18,9 +18,11 @@ export async function GET(req: NextRequest) {
     prisma.receita.findMany({
       where: {
         userId: session.user.id,
+        ativa: true,
         OR: [
-          { data: { gte: inicio, lte: fim } },
-          { recorrente: true, ativa: true },
+          { recorrente: false, data: { gte: inicio, lte: fim } },
+          // Recorrente ainda pendente este mês: data não foi avançada para além do mês
+          { recorrente: true, data: { lte: fim } },
         ],
       },
     }),
@@ -56,8 +58,9 @@ export async function GET(req: NextRequest) {
   }, 0);
 
   const totalDespesas = totalFixas + totalVariaveis;
-  const psi = totalReceitas - totalDespesas;
   const saldoBancario = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
+  // PSI = previsão de fechamento: saldo atual + receitas pendentes - despesas do mês
+  const psi = saldoBancario + totalReceitas - totalDespesas;
 
   return NextResponse.json({
     totalReceitas,
