@@ -35,11 +35,11 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const totalReceitas = receitas.reduce((sum, r) => sum + r.valor, 0);
-  const totalFixas = despesasFixas.reduce((sum, d) => sum + d.valor, 0);
+  const totalReceitas = receitas.reduce((sum: number, r) => sum + r.valor, 0);
+  const totalFixas = despesasFixas.reduce((sum: number, d) => sum + d.valor, 0);
 
   // Only count parcelas that are active in the given month
-  const totalVariaveis = despesasVariaveis.reduce((sum, d) => {
+  const totalVariaveis = despesasVariaveis.reduce((sum: number, d) => {
     const dataInicio = new Date(d.dataInicio);
     const mesInicio = dataInicio.getMonth();
     const anoInicio = dataInicio.getFullYear();
