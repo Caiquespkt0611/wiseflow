@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/receitas", label: "Receitas", icon: ArrowDownCircle },
   { href: "/despesas-fixas", label: "Despesas Fixas", icon: MinusCircle },
   { href: "/despesas-variaveis", label: "Despesas Variáveis", icon: CreditCard },
+  { href: "/contas", label: "Contas Bancárias", icon: Landmark },
   { href: "/projecao", label: "Projeção", icon: BarChart3 },
 ];
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
 import { ReceitaForm, ReceitaFormData } from "@/components/forms/ReceitaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -28,7 +28,10 @@ export default function ReceitasPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/receitas");
-    if (res.ok) setItems(await res.json());
+    if (res.ok) {
+      const all: Receita[] = await res.json();
+      setItems(all.filter((r) => r.ativa));
+    }
     setLoading(false);
   }, []);
 
@@ -60,6 +63,26 @@ export default function ReceitasPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir esta receita?")) return;
     await fetch(`/api/receitas/${id}`, { method: "DELETE" });
+    fetchData();
+  };
+
+  const handleReceber = async (item: Receita) => {
+    if (item.recorrente) {
+      // Avança para o próximo mês
+      const proxData = addMonths(new Date(item.data), 1);
+      await fetch(`/api/receitas/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: format(proxData, "yyyy-MM-dd") }),
+      });
+    } else {
+      // Marca como inativa (recebida) → desaparece da lista
+      await fetch(`/api/receitas/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ativa: false }),
+      });
+    }
     fetchData();
   };
 
@@ -113,19 +136,21 @@ export default function ReceitasPage() {
                       {formatCurrency(item.valor)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {item.recorrente && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                            <RefreshCw className="w-3 h-3" /> Recorrente
-                          </span>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${item.ativa ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-500"}`}>
-                          {item.ativa ? "Ativa" : "Inativa"}
+                      {item.recorrente && (
+                        <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                          <RefreshCw className="w-3 h-3" /> Recorrente
                         </span>
-                      </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleReceber(item)}
+                          title="Confirmar recebimento"
+                          className="p-1.5 hover:bg-emerald-50 rounded-lg group"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                        </button>
                         <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                           <Pencil className="w-4 h-4 text-gray-500" />
                         </button>

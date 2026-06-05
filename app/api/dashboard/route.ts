@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const inicio = new Date(ano, mes - 1, 1);
   const fim = new Date(ano, mes, 0, 23, 59, 59);
 
-  const [receitas, despesasFixas, despesasVariaveis] = await Promise.all([
+  const [receitas, despesasFixas, despesasVariaveis, contasBancarias] = await Promise.all([
     prisma.receita.findMany({
       where: {
         userId: session.user.id,
@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
         userId: session.user.id,
         dataInicio: { lte: fim },
       },
+    }),
+    prisma.contaBancaria.findMany({
+      where: { userId: session.user.id },
     }),
   ]);
 
@@ -54,6 +57,7 @@ export async function GET(req: NextRequest) {
 
   const totalDespesas = totalFixas + totalVariaveis;
   const psi = totalReceitas - totalDespesas;
+  const saldoBancario = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
 
   return NextResponse.json({
     totalReceitas,
@@ -61,6 +65,8 @@ export async function GET(req: NextRequest) {
     totalFixas,
     totalVariaveis,
     psi,
+    saldoBancario,
+    contas: contasBancarias,
     receitas,
     despesasFixas,
     despesasVariaveis: despesasVariaveis.map((d) => {

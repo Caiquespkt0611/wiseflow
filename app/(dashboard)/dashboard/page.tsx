@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Landmark } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface DashboardData {
@@ -12,6 +12,7 @@ interface DashboardData {
   totalFixas: number;
   totalVariaveis: number;
   psi: number;
+  saldoBancario: number;
 }
 
 export default function DashboardPage() {
@@ -59,14 +60,14 @@ export default function DashboardPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white rounded-2xl p-6 h-32 animate-pulse bg-gray-100" />
           ))}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <StatCard
               title="Total Receitas"
               value={data?.totalReceitas ?? 0}
@@ -84,6 +85,12 @@ export default function DashboardPage() {
               value={data?.psi ?? 0}
               icon={<Wallet className="w-6 h-6" />}
               color={(data?.psi ?? 0) >= 0 ? "blue" : "orange"}
+            />
+            <StatCard
+              title="Saldo em Contas"
+              value={data?.saldoBancario ?? 0}
+              icon={<Landmark className="w-6 h-6" />}
+              color={(data?.saldoBancario ?? 0) >= 0 ? "teal" : "orange"}
             />
           </div>
 
@@ -161,6 +168,7 @@ function StatCard({
     red: "bg-red-50 text-red-600",
     blue: "bg-blue-50 text-blue-600",
     orange: "bg-orange-50 text-orange-600",
+    teal: "bg-teal-50 text-teal-600",
   };
 
   return (
