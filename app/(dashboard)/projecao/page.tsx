@@ -119,7 +119,7 @@ export default function ProjecaoPage() {
             ].map((item) => (
               <div key={item.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs text-gray-500 mb-1">{item.label}</p>
-                <p className={`text-lg font-bold ${item.color}`}>
+                <p className={`text-base sm:text-lg font-bold ${item.color} break-all`}>
                   {formatCurrency(item.value)}
                 </p>
               </div>
@@ -127,54 +127,58 @@ export default function ProjecaoPage() {
           </div>
 
           {/* Receitas vs Despesas */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 mb-6 overflow-hidden">
+            <h2 className="text-base font-semibold text-gray-800 mb-4 sm:mb-6">
               Receitas vs Despesas por Mês
             </h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data} margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar dataKey="totalReceitas" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="totalFixas" name="Fixas" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="despesas" />
-                <Bar dataKey="totalVariaveis" name="Variáveis" fill="#f97316" radius={[4, 4, 0, 0]} stackId="despesas" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="w-full min-w-0 overflow-hidden">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 10 }} width={55} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar dataKey="totalReceitas" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="totalFixas" name="Fixas" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="despesas" />
+                  <Bar dataKey="totalVariaveis" name="Variáveis" fill="#f97316" radius={[4, 4, 0, 0]} stackId="despesas" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* PSI acumulado */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-base font-semibold text-gray-800 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 overflow-hidden">
+            <h2 className="text-base font-semibold text-gray-800 mb-4 sm:mb-6">
               PSI Acumulado
             </h2>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={data} margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="psiMes"
-                  name="PSI Mensal"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="psiAcumulado"
-                  name="PSI Acumulado"
-                  stroke="#10b981"
-                  strokeWidth={2.5}
-                  dot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="w-full min-w-0 overflow-hidden">
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 10 }} width={55} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="psiMes"
+                    name="PSI Mensal"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="psiAcumulado"
+                    name="PSI Acumulado"
+                    stroke="#10b981"
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Table */}

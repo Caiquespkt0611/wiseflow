@@ -70,7 +70,7 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
         </Field>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Field label="Parcela Atual" error={errors.parcelaAtual?.message}>
           <input {...register("parcelaAtual")} type="number" min="1" className={inputClass} />
         </Field>
