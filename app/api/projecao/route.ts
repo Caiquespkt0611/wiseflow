@@ -11,6 +11,9 @@ export async function GET(req: NextRequest) {
   const mesBase = Number(searchParams.get("mes") ?? new Date().getMonth() + 1);
   const anoBase = Number(searchParams.get("ano") ?? new Date().getFullYear());
 
+  // Período: mês atual até dezembro do ano seguinte
+  const totalMeses = (12 - mesBase + 1) + 12;
+
   const [receitas, despesasFixas, despesasVariaveis, contasBancarias] = await Promise.all([
     prisma.receita.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
@@ -23,13 +26,10 @@ export async function GET(req: NextRequest) {
   const projecao = [];
   let psiAcumulado = saldoBancario;
 
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < totalMeses; i++) {
     let mes = mesBase + i;
     let ano = anoBase;
-    if (mes > 12) {
-      mes -= 12;
-      ano += 1;
-    }
+    while (mes > 12) { mes -= 12; ano += 1; }
 
     const inicio = new Date(ano, mes - 1, 1);
     const fim = new Date(ano, mes, 0, 23, 59, 59);
@@ -42,7 +42,10 @@ export async function GET(req: NextRequest) {
       })
       .reduce((sum, r) => sum + r.valor, 0);
 
-    const totalFixas = despesasFixas.reduce((sum, d) => sum + d.valor, 0);
+    // Fixas: só conta se dataProximoVencimento for null (sem controle) ou <= fim do mês
+    const totalFixas = despesasFixas
+      .filter((d) => !d.dataProximoVencimento || new Date(d.dataProximoVencimento) <= fim)
+      .reduce((sum, d) => sum + d.valor, 0);
 
     const totalVariaveis = despesasVariaveis.reduce((sum, d) => {
       const dataInicio = new Date(d.dataInicio);
@@ -63,6 +66,7 @@ export async function GET(req: NextRequest) {
       mes,
       ano,
       label: `${String(mes).padStart(2, "0")}/${ano}`,
+      isAtual: i === 0,
       totalReceitas,
       totalDespesas,
       totalFixas,

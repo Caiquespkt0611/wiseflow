@@ -27,7 +27,14 @@ export async function GET(req: NextRequest) {
       },
     }),
     prisma.despesaFixa.findMany({
-      where: { userId: session.user.id, ativa: true },
+      where: {
+        userId: session.user.id,
+        ativa: true,
+        OR: [
+          { dataProximoVencimento: null },
+          { dataProximoVencimento: { lte: fim } },
+        ],
+      },
     }),
     prisma.despesaVariavel.findMany({
       where: {

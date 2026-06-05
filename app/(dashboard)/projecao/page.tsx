@@ -23,6 +23,7 @@ interface ProjecaoMes {
   mes: number;
   ano: number;
   label: string;
+  isAtual: boolean;
   totalReceitas: number;
   totalDespesas: number;
   totalFixas: number;
@@ -313,7 +314,7 @@ export default function ProjecaoPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["Mês", "Receitas", "Fixas", "Variáveis", "Total Desp.", "PSI Mês", "PSI Acum.", ...(simAtiva ? ["PSI Mês (sim)", "PSI Acum. (sim)"] : [])].map((h) => (
+                    {["Mês", "Tipo", "Receitas Pendentes", "Fixas", "Variáveis", "PSI Acumulado", ...(simAtiva ? ["PSI Acum. (sim)"] : [])].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -322,27 +323,25 @@ export default function ProjecaoPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {data.map((row) => (
-                    <tr key={row.label} className="hover:bg-gray-50">
+                    <tr key={row.label} className={`hover:bg-gray-50 ${row.isAtual ? "bg-emerald-50/40" : ""}`}>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.label}</td>
+                      <td className="px-4 py-3">
+                        {row.isAtual ? (
+                          <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">Atual</span>
+                        ) : (
+                          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Projetado</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-emerald-600 font-medium">{formatCurrency(row.totalReceitas)}</td>
                       <td className="px-4 py-3 text-sm text-red-500">{formatCurrency(row.totalFixas)}</td>
                       <td className="px-4 py-3 text-sm text-orange-500">{formatCurrency(row.totalVariaveis)}</td>
-                      <td className="px-4 py-3 text-sm text-red-600 font-medium">{formatCurrency(row.totalDespesas)}</td>
-                      <td className={`px-4 py-3 text-sm font-medium ${row.psiMes >= 0 ? "text-blue-600" : "text-red-600"}`}>
-                        {formatCurrency(row.psiMes)}
-                      </td>
                       <td className={`px-4 py-3 text-sm font-bold ${row.psiAcumulado >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                         {formatCurrency(row.psiAcumulado)}
                       </td>
                       {simAtiva && (
-                        <>
-                          <td className={`px-4 py-3 text-sm font-medium ${(row.psiMesSim ?? 0) >= 0 ? "text-violet-600" : "text-red-600"}`}>
-                            {formatCurrency(row.psiMesSim ?? 0)}
-                          </td>
-                          <td className={`px-4 py-3 text-sm font-bold ${(row.psiAcumuladoSim ?? 0) >= 0 ? "text-violet-700" : "text-red-600"}`}>
-                            {formatCurrency(row.psiAcumuladoSim ?? 0)}
-                          </td>
-                        </>
+                        <td className={`px-4 py-3 text-sm font-bold ${(row.psiAcumuladoSim ?? 0) >= 0 ? "text-violet-700" : "text-red-600"}`}>
+                          {formatCurrency(row.psiAcumuladoSim ?? 0)}
+                        </td>
                       )}
                     </tr>
                   ))}

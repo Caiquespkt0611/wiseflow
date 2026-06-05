@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
 import { DespesaFixaForm, DespesaFixaFormData } from "@/components/forms/DespesaFixaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -15,6 +15,7 @@ interface DespesaFixa {
   recorrente: boolean;
   ativa: boolean;
   dataInicio: string;
+  dataProximoVencimento: string | null;
 }
 
 export default function DespesasFixasPage() {
@@ -62,6 +63,20 @@ export default function DespesasFixasPage() {
     fetchData();
   };
 
+  const handleConfirmar = async (item: DespesaFixa) => {
+    // Avança dataProximoVencimento para o 1º do próximo mês
+    const base = item.dataProximoVencimento
+      ? new Date(item.dataProximoVencimento)
+      : new Date();
+    const proximo = addMonths(new Date(base.getFullYear(), base.getMonth(), 1), 1);
+    await fetch(`/api/despesas-fixas/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataProximoVencimento: format(proximo, "yyyy-MM-dd") }),
+    });
+    fetchData();
+  };
+
   const openEdit = (item: DespesaFixa) => {
     setSelected(item);
     setModal("edit");
@@ -71,7 +86,18 @@ export default function DespesasFixasPage() {
     ? { ...selected, dataInicio: format(new Date(selected.dataInicio), "yyyy-MM-dd") }
     : undefined;
 
-  const totalAtivas = items.filter((i) => i.ativa).reduce((sum, i) => sum + i.valor, 0);
+  // Mostra apenas ativas; separa pagas do mês
+  const now = new Date();
+  const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const ativas = items.filter((i) => i.ativa);
+  const pendentes = ativas.filter(
+    (i) => !i.dataProximoVencimento || new Date(i.dataProximoVencimento) <= fimMes
+  );
+  const pagas = ativas.filter(
+    (i) => i.dataProximoVencimento && new Date(i.dataProximoVencimento) > fimMes
+  );
+
+  const totalPendentes = pendentes.reduce((sum, i) => sum + i.valor, 0);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -80,7 +106,7 @@ export default function DespesasFixasPage() {
           <h1 className="text-2xl font-bold text-gray-900">Despesas Fixas</h1>
           {!loading && (
             <p className="text-sm text-gray-500 mt-1">
-              Total ativo: <span className="font-medium text-red-600">{formatCurrency(totalAtivas)}/mês</span>
+              Pendente este mês: <span className="font-medium text-red-600">{formatCurrency(totalPendentes)}</span>
             </p>
           )}
         </div>
@@ -96,7 +122,7 @@ export default function DespesasFixasPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : items.length === 0 ? (
+        ) : ativas.length === 0 ? (
           <div className="p-8 text-center text-gray-400">Nenhuma despesa fixa cadastrada</div>
         ) : (
           <div className="overflow-x-auto">
@@ -111,26 +137,28 @@ export default function DespesasFixasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {items.map((item) => (
+                {pendentes.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
                     <td className="px-4 py-3 text-sm font-medium text-red-600">{formatCurrency(item.valor)}</td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {item.recorrente && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                            <RefreshCw className="w-3 h-3" /> Recorrente
-                          </span>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${item.ativa ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-500"}`}>
-                          {item.ativa ? "Ativa" : "Inativa"}
+                      {item.recorrente && (
+                        <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                          <RefreshCw className="w-3 h-3" /> Recorrente
                         </span>
-                      </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleConfirmar(item)}
+                          title="Confirmar pagamento"
+                          className="p-1.5 hover:bg-emerald-50 rounded-lg group"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                        </button>
                         <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                           <Pencil className="w-4 h-4 text-gray-500" />
                         </button>
@@ -141,6 +169,37 @@ export default function DespesasFixasPage() {
                     </td>
                   </tr>
                 ))}
+
+                {pagas.length > 0 && (
+                  <>
+                    <tr>
+                      <td colSpan={6} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
+                        Pagas este mês
+                      </td>
+                    </tr>
+                    {pagas.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-400">{formatCurrency(item.valor)}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Paga</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                              <Pencil className="w-4 h-4 text-gray-400" />
+                            </button>
+                            <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
+                              <Trash2 className="w-4 h-4 text-red-300" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
               </tbody>
             </table>
           </div>

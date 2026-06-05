@@ -11,6 +11,7 @@ const schema = z.object({
   recorrente: z.boolean().optional(),
   ativa: z.boolean().optional(),
   dataInicio: z.string().optional(),
+  dataProximoVencimento: z.string().nullable().optional(),
 });
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -27,7 +28,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const data = schema.parse(body);
     const updated = await prisma.despesaFixa.update({
       where: { id: params.id },
-      data: { ...data, ...(data.dataInicio && { dataInicio: new Date(data.dataInicio) }) },
+      data: {
+        ...data,
+        ...(data.dataInicio && { dataInicio: new Date(data.dataInicio) }),
+        ...(data.dataProximoVencimento !== undefined && {
+          dataProximoVencimento: data.dataProximoVencimento ? new Date(data.dataProximoVencimento) : null,
+        }),
+      },
     });
     return NextResponse.json(updated);
   } catch (error) {
