@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  nome      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  receitas          Receita[]
+  despesasFixas     DespesaFixa[]
+  despesasVariaveis DespesaVariavel[]
+
+  @@map("users")
+}
+
+model Receita {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  descricao   String
+  tipo        String
+  valor       Float
+  data        DateTime
+  responsavel String
+  recorrente  Boolean  @default(false)
+  ativa       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("receitas")
+}
+
+model DespesaFixa {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  descricao   String
+  valor       Float
+  responsavel String
+  recorrente  Boolean  @default(true)
+  ativa       Boolean  @default(true)
+  dataInicio  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("despesas_fixas")
+}
+
+model DespesaVariavel {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  descricao     String
+  cartao        String
+  valorTotal    Float
+  parcelaAtual  Int
+  parcelasTotal Int
+  valorParcela  Float
+  responsavel   String
+  dataInicio    DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@map("despesas_variaveis")
+}
