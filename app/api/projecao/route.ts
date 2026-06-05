@@ -37,11 +37,11 @@ export async function GET(req: NextRequest) {
         const data = new Date(r.data);
         return data >= inicio && data <= fim;
       })
-      .reduce((sum: number, r) => sum + r.valor, 0);
+      .reduce((sum, r) => sum + r.valor, 0);
 
-    const totalFixas = despesasFixas.reduce((sum: number, d) => sum + d.valor, 0);
+    const totalFixas = despesasFixas.reduce((sum, d) => sum + d.valor, 0);
 
-    const totalVariaveis = despesasVariaveis.reduce((sum: number, d) => {
+    const totalVariaveis = despesasVariaveis.reduce((sum, d) => {
       const dataInicio = new Date(d.dataInicio);
       const diffMeses =
         (ano - dataInicio.getFullYear()) * 12 + (mes - 1 - dataInicio.getMonth());
