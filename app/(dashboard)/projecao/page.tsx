@@ -314,7 +314,7 @@ export default function ProjecaoPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["Mês", "Tipo", "Receitas Pendentes", "Fixas", "Variáveis", "PSI Acumulado", ...(simAtiva ? ["PSI Acum. (sim)"] : [])].map((h) => (
+                    {["Mês", "Em Caixa", "Receitas", "Fixas", "Variáveis", "PSI Acumulado", "Simulação"].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -322,29 +322,39 @@ export default function ProjecaoPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {data.map((row) => (
-                    <tr key={row.label} className={`hover:bg-gray-50 ${row.isAtual ? "bg-emerald-50/40" : ""}`}>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.label}</td>
-                      <td className="px-4 py-3">
-                        {row.isAtual ? (
-                          <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">Atual</span>
-                        ) : (
-                          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Projetado</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-emerald-600 font-medium">{formatCurrency(row.totalReceitas)}</td>
-                      <td className="px-4 py-3 text-sm text-red-500">{formatCurrency(row.totalFixas)}</td>
-                      <td className="px-4 py-3 text-sm text-orange-500">{formatCurrency(row.totalVariaveis)}</td>
-                      <td className={`px-4 py-3 text-sm font-bold ${row.psiAcumulado >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                        {formatCurrency(row.psiAcumulado)}
-                      </td>
-                      {simAtiva && (
-                        <td className={`px-4 py-3 text-sm font-bold ${(row.psiAcumuladoSim ?? 0) >= 0 ? "text-violet-700" : "text-red-600"}`}>
-                          {formatCurrency(row.psiAcumuladoSim ?? 0)}
+                  {data.map((row, i) => {
+                    const emCaixa = row.isAtual ? saldoBancario : (data[i - 1]?.psiAcumulado ?? saldoBancario);
+                    return (
+                      <tr key={row.label} className={`hover:bg-gray-50 ${row.isAtual ? "bg-emerald-50/40" : ""}`}>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.label}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`text-sm font-bold ${emCaixa >= 0 ? "text-teal-600" : "text-red-600"}`}>
+                              {formatCurrency(emCaixa)}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full w-fit ${row.isAtual ? "bg-emerald-100 text-emerald-700 font-semibold" : "bg-blue-50 text-blue-500"}`}>
+                              {row.isAtual ? "Atual" : "Projetado"}
+                            </span>
+                          </div>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="px-4 py-3 text-sm text-emerald-600 font-medium">{formatCurrency(row.totalReceitas)}</td>
+                        <td className="px-4 py-3 text-sm text-red-500">{formatCurrency(row.totalFixas)}</td>
+                        <td className="px-4 py-3 text-sm text-orange-500">{formatCurrency(row.totalVariaveis)}</td>
+                        <td className={`px-4 py-3 text-sm font-bold ${row.psiAcumulado >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          {formatCurrency(row.psiAcumulado)}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {simAtiva && row.psiAcumuladoSim !== undefined ? (
+                            <span className={`font-bold ${row.psiAcumuladoSim >= 0 ? "text-violet-700" : "text-red-600"}`}>
+                              {formatCurrency(row.psiAcumuladoSim)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
