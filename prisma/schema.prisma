@@ -60,6 +60,7 @@ model DespesaFixa {
   descricao             String
   valor                 Float
   responsavel           String
+  categoria             String    @default("Outros")
   recorrente            Boolean   @default(true)
   ativa                 Boolean   @default(true)
   dataInicio            DateTime
@@ -77,6 +78,7 @@ model DespesaVariavel {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   descricao     String
   cartao        String
+  categoria     String   @default("Outros")
   valorTotal    Float
   parcelaAtual  Int
   parcelasTotal Int

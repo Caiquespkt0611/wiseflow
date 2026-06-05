@@ -42,6 +42,16 @@ function calcVariaveis(
   }, 0);
 }
 
+function groupByCategoria<T extends { categoria: string; valor: number }>(items: T[]) {
+  const map: Record<string, number> = {};
+  for (const item of items) {
+    map[item.categoria] = (map[item.categoria] ?? 0) + item.valor;
+  }
+  return Object.entries(map)
+    .map(([categoria, valor]) => ({ categoria, valor }))
+    .sort((a, b) => b.valor - a.valor);
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -84,7 +94,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Dados do mês solicitado (já filtrados)
   const receitasFixadas = todasReceitas.map(x => ({ ...x, data: new Date(x.data) }));
   const fixasFixadas = todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null }));
   const variaveisFixadas = todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
@@ -95,6 +104,24 @@ export async function GET(req: NextRequest) {
   const totalDespesas = totalFixas + totalVariaveis;
   const psi = saldoEfetivo + totalReceitas - totalDespesas;
 
+  // Breakdown por categoria (para gráficos)
+  const fixasFiltradas = fixasFixadas.filter(
+    (d) => !d.dataProximoVencimento || d.dataProximoVencimento <= fim
+  );
+  const categoriasFixas = groupByCategoria(
+    fixasFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valor }))
+  );
+
+  const variaveisFiltradas = variaveisFixadas.filter((d) => {
+    const diffMeses =
+      (ano - d.dataInicio.getFullYear()) * 12 + (mes - 1 - d.dataInicio.getMonth());
+    const parcelaAtualCalc = d.parcelaAtual + diffMeses;
+    return parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal;
+  });
+  const categoriasVariaveis = groupByCategoria(
+    variaveisFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valorParcela }))
+  );
+
   return NextResponse.json({
     totalReceitas,
     totalDespesas,
@@ -103,5 +130,7 @@ export async function GET(req: NextRequest) {
     psi,
     saldoBancario: saldoEfetivo,
     isFuturo,
+    categoriasFixas,
+    categoriasVariaveis,
   });
 }

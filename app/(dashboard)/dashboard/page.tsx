@@ -4,7 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Landmark } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import { CATEGORIA_COLORS_BY_RANK } from "@/lib/categories";
+
+interface CategoriaItem {
+  categoria: string;
+  valor: number;
+}
 
 interface DashboardData {
   totalReceitas: number;
@@ -14,6 +21,8 @@ interface DashboardData {
   psi: number;
   saldoBancario: number;
   isFuturo: boolean;
+  categoriasFixas: CategoriaItem[];
+  categoriasVariaveis: CategoriaItem[];
 }
 
 export default function DashboardPage() {
@@ -61,14 +70,21 @@ export default function DashboardPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-2xl p-6 h-32 animate-pulse bg-gray-100" />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-2xl p-6 h-32 animate-pulse bg-gray-100" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl p-6 h-72 animate-pulse bg-gray-100" />
+            <div className="bg-white rounded-2xl p-6 h-72 animate-pulse bg-gray-100" />
+          </div>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          {/* Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             <StatCard
               title={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"}
               value={data?.saldoBancario ?? 0}
@@ -95,43 +111,24 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-700 mb-4">Despesas por Tipo</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Fixas</span>
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(data?.totalFixas ?? 0)}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-red-400 rounded-full h-2"
-                    style={{
-                      width: `${data?.totalDespesas ? (data.totalFixas / data.totalDespesas) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Variáveis</span>
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(data?.totalVariaveis ?? 0)}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-orange-400 rounded-full h-2"
-                    style={{
-                      width: `${data?.totalDespesas ? (data.totalVariaveis / data.totalDespesas) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+          {/* Donut Charts */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <DonutCard
+              title="Despesas Fixas por Categoria"
+              data={data?.categoriasFixas ?? []}
+              total={data?.totalFixas ?? 0}
+            />
+            <DonutCard
+              title="Despesas Variáveis por Categoria"
+              data={data?.categoriasVariaveis ?? []}
+              total={data?.totalVariaveis ?? 0}
+            />
+          </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-700 mb-4">Resumo</h3>
+          {/* Resumo */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-700 mb-4">Resumo do Mês</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
                 <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
@@ -139,17 +136,108 @@ export default function DashboardPage() {
                 <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
                 <div className="border-t pt-3">
                   <Row
-                    label="PSI (Previsão)"
+                    label="PSI (Previsão de Fechamento)"
                     value={data?.psi ?? 0}
                     bold
                     positive={(data?.psi ?? 0) >= 0}
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Breakdown Fixas</p>
+                {(data?.categoriasFixas ?? []).slice(0, 5).map((c, i) => (
+                  <div key={c.categoria} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORIA_COLORS_BY_RANK[i] }} />
+                      <span className="text-sm text-gray-600">{c.categoria}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-800">{formatCurrency(c.valor)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function DonutCard({ title, data, total }: { title: string; data: CategoriaItem[]; total: number }) {
+  if (data.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h3 className="font-semibold text-gray-700 mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+          Sem dados este mês
+        </div>
+      </div>
+    );
+  }
+
+  const chartData = data.map((d, i) => ({
+    ...d,
+    fill: CATEGORIA_COLORS_BY_RANK[i] ?? CATEGORIA_COLORS_BY_RANK[CATEGORIA_COLORS_BY_RANK.length - 1],
+    pct: total > 0 ? ((d.valor / total) * 100).toFixed(1) : "0",
+  }));
+
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <h3 className="font-semibold text-gray-700 mb-4">{title}</h3>
+      <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="relative w-48 h-48 flex-shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={52}
+                outerRadius={80}
+                paddingAngle={2}
+                dataKey="valor"
+                startAngle={90}
+                endAngle={-270}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={index} fill={entry.fill} strokeWidth={0} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-xs text-gray-400">Total</span>
+            <span className="text-sm font-bold text-gray-800">{formatCurrency(total)}</span>
+          </div>
+        </div>
+        <div className="flex-1 space-y-2 w-full">
+          {chartData.map((item, i) => (
+            <div key={item.categoria} className="flex items-center gap-2">
+              <div
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: item.fill }}
+              />
+              <span className="text-xs text-gray-600 flex-1 truncate">{item.categoria}</span>
+              <span className="text-xs font-semibold" style={{ color: CATEGORIA_COLORS_BY_RANK[i] ?? "#71717a" }}>
+                {item.pct}%
+              </span>
+              <span className="text-xs text-gray-500 w-20 text-right">{formatCurrency(item.valor)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payload: { categoria: string; valor: number; pct: string }; fill: string }[] }) {
+  if (!active || !payload?.length) return null;
+  const { categoria, valor, pct } = payload[0].payload;
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-gray-800">{categoria}</p>
+      <p className="text-gray-600">{formatCurrency(valor)} <span className="text-gray-400">({pct}%)</span></p>
     </div>
   );
 }

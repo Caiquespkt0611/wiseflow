@@ -3,10 +3,12 @@
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CATEGORIAS } from "@/lib/categories";
 
 const schema = z.object({
   descricao: z.string().min(1, "Obrigatório"),
   cartao: z.string().min(1, "Obrigatório"),
+  categoria: z.string().min(1, "Obrigatório"),
   valorTotal: z.coerce.number().positive("Obrigatório"),
   parcelaAtual: z.coerce.number().int().min(1, "Obrigatório"),
   parcelasTotal: z.coerce.number().int().min(1, "Obrigatório"),
@@ -32,7 +34,7 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
     formState: { errors },
   } = useForm<DespesaVariavelFormData>({
     resolver: zodResolver(schema) as Resolver<DespesaVariavelFormData>,
-    defaultValues: { parcelaAtual: 1, ...defaultValues },
+    defaultValues: { parcelaAtual: 1, categoria: "Outros", ...defaultValues },
   });
 
   const valorTotal = watch("valorTotal");
@@ -50,9 +52,18 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
         <input {...register("descricao")} className={inputClass} placeholder="Ex: iPhone 16" />
       </Field>
 
-      <Field label="Cartão" error={errors.cartao?.message}>
-        <input {...register("cartao")} className={inputClass} placeholder="Ex: Nubank, Inter..." />
-      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Cartão" error={errors.cartao?.message}>
+          <input {...register("cartao")} className={inputClass} placeholder="Ex: Nubank, Inter..." />
+        </Field>
+        <Field label="Categoria" error={errors.categoria?.message}>
+          <select {...register("categoria")} className={inputClass}>
+            {CATEGORIAS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Valor Total (R$)" error={errors.valorTotal?.message}>

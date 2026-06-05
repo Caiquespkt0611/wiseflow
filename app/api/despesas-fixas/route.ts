@@ -8,6 +8,7 @@ const schema = z.object({
   descricao: z.string().min(1),
   valor: z.number().positive(),
   responsavel: z.string().min(1),
+  categoria: z.string().default("Outros"),
   recorrente: z.boolean().default(true),
   ativa: z.boolean().default(true),
   dataInicio: z.string(),

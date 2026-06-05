@@ -3,11 +3,13 @@
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CATEGORIAS } from "@/lib/categories";
 
 const schema = z.object({
   descricao: z.string().min(1, "Obrigatório"),
   valor: z.coerce.number().positive("Valor deve ser positivo"),
   responsavel: z.string().min(1, "Obrigatório"),
+  categoria: z.string().min(1, "Obrigatório"),
   recorrente: z.boolean(),
   ativa: z.boolean(),
   dataInicio: z.string().min(1, "Obrigatório"),
@@ -28,7 +30,7 @@ export function DespesaFixaForm({ defaultValues, onSubmit, loading }: Props) {
     formState: { errors },
   } = useForm<DespesaFixaFormData>({
     resolver: zodResolver(schema) as Resolver<DespesaFixaFormData>,
-    defaultValues: { ativa: true, recorrente: true, ...defaultValues },
+    defaultValues: { ativa: true, recorrente: true, categoria: "Outros", ...defaultValues },
   });
 
   return (
@@ -46,9 +48,18 @@ export function DespesaFixaForm({ defaultValues, onSubmit, loading }: Props) {
         </Field>
       </div>
 
-      <Field label="Responsável" error={errors.responsavel?.message}>
-        <input {...register("responsavel")} className={inputClass} placeholder="Nome do responsável" />
-      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Responsável" error={errors.responsavel?.message}>
+          <input {...register("responsavel")} className={inputClass} placeholder="Nome do responsável" />
+        </Field>
+        <Field label="Categoria" error={errors.categoria?.message}>
+          <select {...register("categoria")} className={inputClass}>
+            {CATEGORIAS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
 
       <div className="flex gap-6">
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 const schema = z.object({
   descricao: z.string().min(1).optional(),
   cartao: z.string().min(1).optional(),
+  categoria: z.string().optional(),
   valorTotal: z.number().positive().optional(),
   parcelaAtual: z.number().int().min(1).optional(),
   parcelasTotal: z.number().int().min(1).optional(),
