@@ -13,6 +13,7 @@ interface DashboardData {
   totalVariaveis: number;
   psi: number;
   saldoBancario: number;
+  isFuturo: boolean;
 }
 
 export default function DashboardPage() {
@@ -69,7 +70,7 @@ export default function DashboardPage() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <StatCard
-              title="Saldo em Contas"
+              title={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"}
               value={data?.saldoBancario ?? 0}
               icon={<Landmark className="w-6 h-6" />}
               color={(data?.saldoBancario ?? 0) >= 0 ? "teal" : "orange"}
@@ -132,7 +133,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-700 mb-4">Resumo</h3>
               <div className="space-y-3">
-                <Row label="Saldo em Contas" value={data?.saldoBancario ?? 0} positive />
+                <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
                 <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
                 <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
                 <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />

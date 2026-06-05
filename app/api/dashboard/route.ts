@@ -3,6 +3,45 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function calcReceitas(
+  receitas: { valor: number; recorrente: boolean; ativa: boolean; data: Date }[],
+  inicio: Date,
+  fim: Date
+) {
+  return receitas
+    .filter((r) => {
+      if (!r.ativa) return false;
+      if (r.recorrente) return r.data <= fim;
+      return r.data >= inicio && r.data <= fim;
+    })
+    .reduce((sum, r) => sum + r.valor, 0);
+}
+
+function calcFixas(
+  fixas: { valor: number; dataProximoVencimento: Date | null }[],
+  fim: Date
+) {
+  return fixas
+    .filter((d) => !d.dataProximoVencimento || d.dataProximoVencimento <= fim)
+    .reduce((sum, d) => sum + d.valor, 0);
+}
+
+function calcVariaveis(
+  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date }[],
+  mes: number,
+  ano: number
+) {
+  return variaveis.reduce((sum, d) => {
+    const diffMeses =
+      (ano - d.dataInicio.getFullYear()) * 12 + (mes - 1 - d.dataInicio.getMonth());
+    const parcelaAtualCalc = d.parcelaAtual + diffMeses;
+    if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal) {
+      return sum + d.valorParcela;
+    }
+    return sum;
+  }, 0);
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -11,63 +50,50 @@ export async function GET(req: NextRequest) {
   const mes = Number(searchParams.get("mes") ?? new Date().getMonth() + 1);
   const ano = Number(searchParams.get("ano") ?? new Date().getFullYear());
 
+  const now = new Date();
+  const mesAtual = now.getMonth() + 1;
+  const anoAtual = now.getFullYear();
+  const isFuturo = ano * 12 + mes > anoAtual * 12 + mesAtual;
+
   const inicio = new Date(ano, mes - 1, 1);
   const fim = new Date(ano, mes, 0, 23, 59, 59);
 
-  const [receitas, despesasFixas, despesasVariaveis, contasBancarias] = await Promise.all([
-    prisma.receita.findMany({
-      where: {
-        userId: session.user.id,
-        ativa: true,
-        OR: [
-          { recorrente: false, data: { gte: inicio, lte: fim } },
-          // Recorrente ainda pendente este mês: data não foi avançada para além do mês
-          { recorrente: true, data: { lte: fim } },
-        ],
-      },
-    }),
-    prisma.despesaFixa.findMany({
-      where: {
-        userId: session.user.id,
-        ativa: true,
-        OR: [
-          { dataProximoVencimento: null },
-          { dataProximoVencimento: { lte: fim } },
-        ],
-      },
-    }),
-    prisma.despesaVariavel.findMany({
-      where: {
-        userId: session.user.id,
-        dataInicio: { lte: fim },
-      },
-    }),
-    prisma.contaBancaria.findMany({
-      where: { userId: session.user.id },
-    }),
+  const [todasReceitas, todasFixas, todasVariaveis, contasBancarias] = await Promise.all([
+    prisma.receita.findMany({ where: { userId: session.user.id } }),
+    prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
+    prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
+    prisma.contaBancaria.findMany({ where: { userId: session.user.id } }),
   ]);
 
-  const totalReceitas = receitas.reduce((sum, r) => sum + r.valor, 0);
-  const totalFixas = despesasFixas.reduce((sum, d) => sum + d.valor, 0);
+  const saldoBancarioReal = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
 
-  // Only count parcelas that are active in the given month
-  const totalVariaveis = despesasVariaveis.reduce((sum, d) => {
-    const dataInicio = new Date(d.dataInicio);
-    const mesInicio = dataInicio.getMonth();
-    const anoInicio = dataInicio.getFullYear();
-    const diffMeses =
-      (ano - anoInicio) * 12 + (mes - 1 - mesInicio);
-    const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal) {
-      return sum + d.valorParcela;
+  // Para meses futuros: acumula PSI desde o mês atual até o mês anterior ao solicitado
+  let saldoEfetivo = saldoBancarioReal;
+  if (isFuturo) {
+    let m = mesAtual;
+    let a = anoAtual;
+    while (a * 12 + m < ano * 12 + mes) {
+      const ini = new Date(a, m - 1, 1);
+      const fim_m = new Date(a, m, 0, 23, 59, 59);
+      const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m);
+      const f = calcFixas(todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), fim_m);
+      const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
+      saldoEfetivo += r - f - v;
+      m++;
+      if (m > 12) { m = 1; a++; }
     }
-    return sum;
-  }, 0);
+  }
 
+  // Dados do mês solicitado (já filtrados)
+  const receitasFixadas = todasReceitas.map(x => ({ ...x, data: new Date(x.data) }));
+  const fixasFixadas = todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null }));
+  const variaveisFixadas = todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
+
+  const totalReceitas = calcReceitas(receitasFixadas, inicio, fim);
+  const totalFixas = calcFixas(fixasFixadas, fim);
+  const totalVariaveis = calcVariaveis(variaveisFixadas, mes, ano);
   const totalDespesas = totalFixas + totalVariaveis;
-  const saldoBancario = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
-  // PSI = previsão de fechamento: saldo atual + receitas pendentes - despesas do mês
-  const psi = saldoBancario + totalReceitas - totalDespesas;
+  const psi = saldoEfetivo + totalReceitas - totalDespesas;
 
   return NextResponse.json({
     totalReceitas,
@@ -75,19 +101,7 @@ export async function GET(req: NextRequest) {
     totalFixas,
     totalVariaveis,
     psi,
-    saldoBancario,
-    contas: contasBancarias,
-    receitas,
-    despesasFixas,
-    despesasVariaveis: despesasVariaveis.map((d) => {
-      const dataInicio = new Date(d.dataInicio);
-      const diffMeses =
-        (ano - dataInicio.getFullYear()) * 12 +
-        (mes - 1 - dataInicio.getMonth());
-      return {
-        ...d,
-        parcelaAtualMes: d.parcelaAtual + diffMeses,
-      };
-    }),
+    saldoBancario: saldoEfetivo,
+    isFuturo,
   });
 }
