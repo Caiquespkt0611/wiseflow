@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, CalendarX, X } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, CalendarX, X, Search } from "lucide-react";
 import { format, addMonths, differenceInCalendarMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
@@ -63,6 +63,7 @@ export default function ReceitasPage() {
   const [saving, setSaving] = useState(false);
   const [skipModal, setSkipModal] = useState<Receita | null>(null);
   const [skipMes, setSkipMes] = useState("");
+  const [filtro, setFiltro] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -169,6 +170,15 @@ export default function ReceitasPage() {
       }
     : undefined;
 
+  const itemsFiltrados = filtro
+    ? items.filter(
+        (i) =>
+          i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+          i.tipo.toLowerCase().includes(filtro.toLowerCase()) ||
+          i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+      )
+    : items;
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -188,6 +198,19 @@ export default function ReceitasPage() {
         ) : items.length === 0 ? (
           <div className="p-8 text-center text-gray-400">Nenhuma receita cadastrada</div>
         ) : (
+          <>
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por descrição, tipo ou responsável..."
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
@@ -200,7 +223,13 @@ export default function ReceitasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {items.map((item) => {
+                {itemsFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
+                      Nenhum resultado encontrado
+                    </td>
+                  </tr>
+                ) : itemsFiltrados.map((item) => {
                   const proximasExcecoes = getProximasExcecoes(item);
                   return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
@@ -276,6 +305,7 @@ export default function ReceitasPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

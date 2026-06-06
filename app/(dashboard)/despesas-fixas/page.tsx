@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, Search } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
 import { DespesaFixaForm, DespesaFixaFormData } from "@/components/forms/DespesaFixaForm";
@@ -24,6 +24,7 @@ export default function DespesasFixasPage() {
   const [modal, setModal] = useState<"create" | "edit" | null>(null);
   const [selected, setSelected] = useState<DespesaFixa | null>(null);
   const [saving, setSaving] = useState(false);
+  const [filtro, setFiltro] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -89,7 +90,12 @@ export default function DespesasFixasPage() {
   // Mostra apenas ativas; separa pagas do mês
   const now = new Date();
   const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  const ativas = items.filter((i) => i.ativa);
+  const ativas = items.filter((i) => i.ativa).filter(
+    (i) =>
+      !filtro ||
+      i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+      i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+  );
   const pendentes = ativas.filter(
     (i) => !i.dataProximoVencimento || new Date(i.dataProximoVencimento) <= fimMes
   );
@@ -122,9 +128,22 @@ export default function DespesasFixasPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : ativas.length === 0 ? (
+        ) : items.filter((i) => i.ativa).length === 0 ? (
           <div className="p-8 text-center text-gray-400">Nenhuma despesa fixa cadastrada</div>
         ) : (
+          <>
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por descrição ou responsável..."
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
@@ -203,6 +222,7 @@ export default function DespesasFixasPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, Search } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
 import { DespesaVariavelForm, DespesaVariavelPayload } from "@/components/forms/DespesaVariavelForm";
@@ -26,6 +26,7 @@ export default function DespesasVariaveisPage() {
   const [modal, setModal] = useState<"create" | "edit" | null>(null);
   const [selected, setSelected] = useState<DespesaVariavel | null>(null);
   const [saving, setSaving] = useState(false);
+  const [filtro, setFiltro] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -102,8 +103,17 @@ export default function DespesasVariaveisPage() {
     return item.parcelaAtual + diffMeses;
   };
 
-  const ativas = items.filter((item) => getParcelaAtual(item) <= item.parcelasTotal);
-  const concluidas = items.filter((item) => getParcelaAtual(item) > item.parcelasTotal);
+  const itensFiltrados = filtro
+    ? items.filter(
+        (i) =>
+          i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+          i.cartao.toLowerCase().includes(filtro.toLowerCase()) ||
+          i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+      )
+    : items;
+
+  const ativas = itensFiltrados.filter((item) => getParcelaAtual(item) <= item.parcelasTotal);
+  const concluidas = itensFiltrados.filter((item) => getParcelaAtual(item) > item.parcelasTotal);
   const totalMensal = ativas.reduce((sum, i) => sum + i.valorParcela, 0);
 
   // Parcela deste mês paga = vencimento já foi avançado para um mês futuro
@@ -144,6 +154,19 @@ export default function DespesasVariaveisPage() {
         ) : items.length === 0 ? (
           <div className="p-8 text-center text-gray-400">Nenhuma despesa variável cadastrada</div>
         ) : (
+          <>
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por descrição, cartão ou responsável..."
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
@@ -254,6 +277,7 @@ export default function DespesasVariaveisPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

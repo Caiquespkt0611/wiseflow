@@ -23,6 +23,7 @@ interface DashboardData {
   isFuturo: boolean;
   categoriasFixas: CategoriaItem[];
   categoriasVariaveis: CategoriaItem[];
+  cartaoVariaveis: CategoriaItem[];
 }
 
 export default function DashboardPage() {
@@ -111,8 +112,8 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Donut Charts */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {/* Donut Charts: fixas + variáveis */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <DonutCard
               title="Despesas Fixas por Categoria"
               data={data?.categoriasFixas ?? []}
@@ -125,40 +126,67 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Resumo */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          {/* Donut Chart: variáveis por cartão */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <DonutCard
+              title="Variáveis por Cartão de Crédito"
+              data={data?.cartaoVariaveis ?? []}
+              total={data?.totalVariaveis ?? 0}
+            />
+          </div>
+
+          {/* Resumo simplificado */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-4">
             <h3 className="font-semibold text-gray-700 mb-4">Resumo do Mês</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
-                <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
-                <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
-                <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
-                <div className="border-t pt-3">
-                  <Row
-                    label="PSI (Previsão de Fechamento)"
-                    value={data?.psi ?? 0}
-                    bold
-                    positive={(data?.psi ?? 0) >= 0}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Breakdown Fixas</p>
-                {(data?.categoriasFixas ?? []).slice(0, 5).map((c, i) => (
-                  <div key={c.categoria} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORIA_COLORS_BY_RANK[i] }} />
-                      <span className="text-sm text-gray-600">{c.categoria}</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-800">{formatCurrency(c.valor)}</span>
-                  </div>
-                ))}
+            <div className="space-y-3 max-w-sm">
+              <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
+              <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
+              <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
+              <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
+              <div className="border-t pt-3">
+                <Row
+                  label="PSI (Previsão de Fechamento)"
+                  value={data?.psi ?? 0}
+                  bold
+                  positive={(data?.psi ?? 0) >= 0}
+                />
               </div>
             </div>
           </div>
+
+          {/* Breakdowns por categoria */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <BreakdownCard
+              title="Fixas por Categoria"
+              items={data?.categoriasFixas ?? []}
+            />
+            <BreakdownCard
+              title="Variáveis por Categoria"
+              items={data?.categoriasVariaveis ?? []}
+            />
+          </div>
         </>
       )}
+    </div>
+  );
+}
+
+function BreakdownCard({ title, items }: { title: string; items: CategoriaItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">{title}</p>
+      <div className="space-y-2">
+        {items.slice(0, 8).map((c, i) => (
+          <div key={c.categoria} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORIA_COLORS_BY_RANK[i] ?? CATEGORIA_COLORS_BY_RANK[CATEGORIA_COLORS_BY_RANK.length - 1] }} />
+              <span className="text-sm text-gray-600">{c.categoria}</span>
+            </div>
+            <span className="text-sm font-medium text-gray-800">{formatCurrency(c.valor)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

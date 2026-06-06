@@ -122,6 +122,10 @@ export async function GET(req: NextRequest) {
     variaveisFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valorParcela }))
   );
 
+  const cartaoVariaveis = groupByCategoria(
+    variaveisFiltradas.map((d) => ({ categoria: (d as { cartao?: string }).cartao ?? "Sem cartão", valor: d.valorParcela }))
+  );
+
   return NextResponse.json({
     totalReceitas,
     totalDespesas,
@@ -132,5 +136,6 @@ export async function GET(req: NextRequest) {
     isFuturo,
     categoriasFixas,
     categoriasVariaveis,
+    cartaoVariaveis,
   });
 }
