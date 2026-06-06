@@ -14,10 +14,11 @@ export async function GET(req: NextRequest) {
   // Período: mês atual até dezembro do ano seguinte
   const totalMeses = (12 - mesBase + 1) + 12;
 
-  const [receitas, despesasFixas, despesasVariaveis, contasBancarias] = await Promise.all([
+  const [receitas, despesasFixas, despesasVariaveis, receitasVariaveis, contasBancarias] = await Promise.all([
     prisma.receita.findMany({ where: { userId: session.user.id, ativa: true }, }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
+    prisma.receitaVariavel.findMany({ where: { userId: session.user.id } }),
     prisma.contaBancaria.findMany({ where: { userId: session.user.id } }),
   ]);
 
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
 
-    const totalReceitas = receitas
+    const totalReceitasFixas = receitas
       .filter((r) => {
         if (r.parcelada && r.mesesTotal) {
           const dataInicio = new Date(r.data);
@@ -53,6 +54,18 @@ export async function GET(req: NextRequest) {
         return data >= inicio && data <= fim;
       })
       .reduce((sum, r) => sum + r.valor, 0);
+
+    const totalReceitasVar = receitasVariaveis.reduce((sum, r) => {
+      const dataInicio = new Date(r.dataInicio);
+      const diffMeses = (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
+      const parcelaAtualCalc = r.parcelaAtual + diffMeses;
+      if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= r.parcelasTotal) {
+        return sum + r.valorParcela;
+      }
+      return sum;
+    }, 0);
+
+    const totalReceitas = totalReceitasFixas + totalReceitasVar;
 
     // Fixas: só conta se dataProximoVencimento for null (sem controle) ou <= fim do mês
     const totalFixas = despesasFixas

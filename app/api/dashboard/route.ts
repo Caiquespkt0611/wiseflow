@@ -53,6 +53,21 @@ function calcVariaveis(
   }, 0);
 }
 
+function calcReceitasVar(
+  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date }[],
+  mes: number,
+  ano: number
+) {
+  return variaveis.reduce((sum, r) => {
+    const diffMeses = (ano - r.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - r.dataInicio.getUTCMonth());
+    const parcelaAtualCalc = r.parcelaAtual + diffMeses;
+    if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= r.parcelasTotal) {
+      return sum + r.valorParcela;
+    }
+    return sum;
+  }, 0);
+}
+
 function groupByCategoria<T extends { categoria: string; valor: number }>(items: T[]) {
   const map: Record<string, number> = {};
   for (const item of items) {
@@ -79,10 +94,11 @@ export async function GET(req: NextRequest) {
   const inicio = new Date(ano, mes - 1, 1);
   const fim = new Date(ano, mes, 0, 23, 59, 59);
 
-  const [todasReceitas, todasFixas, todasVariaveis, contasBancarias] = await Promise.all([
+  const [todasReceitas, todasFixas, todasVariaveis, todasReceitasVar, contasBancarias] = await Promise.all([
     prisma.receita.findMany({ where: { userId: session.user.id } }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
+    prisma.receitaVariavel.findMany({ where: { userId: session.user.id } }),
     prisma.contaBancaria.findMany({ where: { userId: session.user.id } }),
   ]);
 
@@ -97,9 +113,10 @@ export async function GET(req: NextRequest) {
       const ini = new Date(a, m - 1, 1);
       const fim_m = new Date(a, m, 0, 23, 59, 59);
       const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a);
+      const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       const f = calcFixas(todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), fim_m);
       const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
-      saldoEfetivo += r - f - v;
+      saldoEfetivo += r + rv - f - v;
       m++;
       if (m > 12) { m = 1; a++; }
     }
@@ -108,8 +125,9 @@ export async function GET(req: NextRequest) {
   const receitasFixadas = todasReceitas.map(x => ({ ...x, data: new Date(x.data) }));
   const fixasFixadas = todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null }));
   const variaveisFixadas = todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
+  const receitasVarFixadas = todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
 
-  const totalReceitas = calcReceitas(receitasFixadas, inicio, fim, mes, ano);
+  const totalReceitas = calcReceitas(receitasFixadas, inicio, fim, mes, ano) + calcReceitasVar(receitasVarFixadas, mes, ano);
   const totalFixas = calcFixas(fixasFixadas, fim);
   const totalVariaveis = calcVariaveis(variaveisFixadas, mes, ano);
   const totalDespesas = totalFixas + totalVariaveis;
