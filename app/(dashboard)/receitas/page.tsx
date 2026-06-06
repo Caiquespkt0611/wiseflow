@@ -107,9 +107,20 @@ export default function ReceitasPage() {
   };
 
   const handleReceber = async (item: Receita) => {
+    const confirmadaAte = format(new Date(), "yyyy-MM-dd");
+    if (item.parcelada) {
+      const isLast = getParcelaAtual(item) >= (item.mesesTotal ?? 1);
+      const payload = isLast ? { confirmadaAte, ativa: false } : { confirmadaAte };
+      await fetch(`/api/receitas/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      fetchData();
+      return;
+    }
     const d = new Date(item.data);
     const proxData = addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
-    const confirmadaAte = format(new Date(), "yyyy-MM-dd");
     const payload = item.recorrente
       ? { data: format(proxData, "yyyy-MM-dd"), confirmadaAte }
       : { data: format(proxData, "yyyy-MM-dd"), ativa: false, confirmadaAte };
@@ -296,11 +307,9 @@ export default function ReceitasPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              {!item.parcelada && (
-                                <button onClick={() => handleReceber(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
-                                  <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                                </button>
-                              )}
+                              <button onClick={() => handleReceber(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
+                                <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                              </button>
                               {item.recorrente && (
                                 <button onClick={() => { setSkipModal(item); setSkipMes(""); }} title="Pular mês" className="p-1.5 hover:bg-orange-50 rounded-lg group">
                                   <CalendarX className="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" />

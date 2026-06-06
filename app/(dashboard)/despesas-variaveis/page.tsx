@@ -70,12 +70,18 @@ export default function DespesasVariaveisPage() {
   };
 
   const handleConfirmar = async (item: DespesaVariavel) => {
-    const novaData = format(addMonths(new Date(item.dataInicio), 1), "yyyy-MM-dd");
+    const d = new Date(item.dataInicio);
+    const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
+    const isLast = getParcelaAtual(item) >= item.parcelasTotal;
     await fetch(`/api/despesas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataInicio: novaData, confirmadaAte }),
+      body: JSON.stringify({
+        dataInicio: novaData,
+        confirmadaAte,
+        ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
+      }),
     });
     fetchData();
   };
