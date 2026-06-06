@@ -126,30 +126,28 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Donut Chart: variáveis por cartão */}
+          {/* Donut Chart: variáveis por cartão + Resumo lado a lado */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <DonutCard
               title="Variáveis por Cartão de Crédito"
               data={data?.cartaoVariaveis ?? []}
               total={data?.totalVariaveis ?? 0}
             />
-          </div>
-
-          {/* Resumo simplificado */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-4">
-            <h3 className="font-semibold text-gray-700 mb-4">Resumo do Mês</h3>
-            <div className="space-y-3 max-w-sm">
-              <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
-              <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
-              <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
-              <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
-              <div className="border-t pt-3">
-                <Row
-                  label="PSI (Previsão de Fechamento)"
-                  value={data?.psi ?? 0}
-                  bold
-                  positive={(data?.psi ?? 0) >= 0}
-                />
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <h3 className="font-semibold text-gray-700 mb-4">Resumo do Mês</h3>
+              <div className="space-y-3">
+                <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
+                <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
+                <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
+                <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
+                <div className="border-t pt-3">
+                  <Row
+                    label="PSI (Previsão de Fechamento)"
+                    value={data?.psi ?? 0}
+                    bold
+                    positive={(data?.psi ?? 0) >= 0}
+                  />
+                </div>
               </div>
             </div>
           </div>
