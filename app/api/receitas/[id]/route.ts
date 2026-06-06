@@ -15,6 +15,7 @@ const schema = z.object({
   mesesTotal: z.number().int().positive().optional().nullable(),
   excecoes: z.array(z.string()).optional(),
   ativa: z.boolean().optional(),
+  confirmadaAte: z.string().nullable().optional(),
 });
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -31,7 +32,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const data = schema.parse(body);
     const updated = await prisma.receita.update({
       where: { id: params.id },
-      data: { ...data, ...(data.data && { data: new Date(data.data) }) },
+      data: {
+        ...data,
+        ...(data.data && { data: new Date(data.data) }),
+        ...(data.confirmadaAte !== undefined && {
+          confirmadaAte: data.confirmadaAte ? new Date(data.confirmadaAte) : null,
+        }),
+      },
     });
     return NextResponse.json(updated);
   } catch (error) {

@@ -45,13 +45,14 @@ model Receita {
   valor       Float
   data        DateTime
   responsavel String
-  recorrente  Boolean  @default(false)
-  parcelada   Boolean  @default(false)
-  mesesTotal  Int?
-  excecoes    String[] @default([])
-  ativa       Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  recorrente    Boolean   @default(false)
+  parcelada     Boolean   @default(false)
+  mesesTotal    Int?
+  excecoes      String[]  @default([])
+  ativa         Boolean   @default(true)
+  confirmadaAte DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([userId])
   @@map("receitas")

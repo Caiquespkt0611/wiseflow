@@ -21,6 +21,7 @@ interface Receita {
   mesesTotal: number | null;
   excecoes: string[];
   ativa: boolean;
+  confirmadaAte: string | null;
 }
 
 type RecorrenciaOpt = "unica" | "recorrente" | "parcelada";
@@ -108,9 +109,10 @@ export default function ReceitasPage() {
   const handleReceber = async (item: Receita) => {
     const d = new Date(item.data);
     const proxData = addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
+    const confirmadaAte = format(new Date(), "yyyy-MM-dd");
     const payload = item.recorrente
-      ? { data: format(proxData, "yyyy-MM-dd") }
-      : { data: format(proxData, "yyyy-MM-dd"), ativa: false };
+      ? { data: format(proxData, "yyyy-MM-dd"), confirmadaAte }
+      : { data: format(proxData, "yyyy-MM-dd"), ativa: false, confirmadaAte };
     await fetch(`/api/receitas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -168,12 +170,9 @@ export default function ReceitasPage() {
   const now = new Date();
 
   const isRecebida = (item: Receita) => {
-    if (item.parcelada) return false;
-    const d = new Date(item.data);
-    return (
-      d.getUTCFullYear() > now.getFullYear() ||
-      (d.getUTCFullYear() === now.getFullYear() && d.getUTCMonth() > now.getMonth())
-    );
+    if (!item.confirmadaAte) return false;
+    const c = new Date(item.confirmadaAte);
+    return c.getUTCFullYear() === now.getFullYear() && c.getUTCMonth() === now.getMonth();
   };
 
   const sorters: Partial<Record<string, (i: Receita) => string | number>> = {
