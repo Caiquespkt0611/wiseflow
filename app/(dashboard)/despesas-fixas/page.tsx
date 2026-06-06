@@ -106,10 +106,12 @@ export default function DespesasFixasPage() {
     ? { ...selected, dataInicio: selected.dataInicio.slice(0, 10) }
     : undefined;
 
-  // Item appeared in selected month: started before end of month
+  // Item appeared in selected month: started in this month or before (UTC comparison)
   const isActiveInMonth = (item: DespesaFixa): boolean => {
-    const dataInicio = new Date(item.dataInicio);
-    return dataInicio <= fim;
+    const d = new Date(item.dataInicio);
+    const iniAno = d.getUTCFullYear();
+    const iniMes = d.getUTCMonth() + 1;
+    return iniAno < ano || (iniAno === ano && iniMes <= mes);
   };
 
   // Item was paid for selected month: next due date (UTC) is in a month after this one

@@ -30,16 +30,20 @@ function calcReceitas(
 }
 
 function calcFixas(
-  fixas: { valor: number; dataProximoVencimento: Date | null }[],
+  fixas: { valor: number; dataProximoVencimento: Date | null; dataInicio: Date }[],
   mes: number,
   ano: number
 ) {
   return fixas
     .filter((d) => {
+      // Exclude items that haven't started yet in this month (UTC comparison)
+      const iniAno = d.dataInicio.getUTCFullYear();
+      const iniMes = d.dataInicio.getUTCMonth() + 1;
+      if (iniAno > ano || (iniAno === ano && iniMes > mes)) return false;
+      // Exclude items already paid for this month
       if (!d.dataProximoVencimento) return true;
       const proxAno = d.dataProximoVencimento.getUTCFullYear();
       const proxMes = d.dataProximoVencimento.getUTCMonth() + 1;
-      // Pending if next due is in this month or before (not yet paid for selected month)
       return proxAno < ano || (proxAno === ano && proxMes <= mes);
     })
     .reduce((sum, d) => sum + d.valor, 0);
@@ -120,7 +124,7 @@ export async function GET(req: NextRequest) {
       const fim_m = new Date(a, m, 0, 23, 59, 59);
       const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a);
       const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
-      const f = calcFixas(todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), m, a);
+      const f = calcFixas(todasFixas.map(x => ({ ...x, dataInicio: new Date(x.dataInicio), dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), m, a);
       const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       saldoEfetivo += r + rv - f - v;
       m++;
@@ -129,7 +133,7 @@ export async function GET(req: NextRequest) {
   }
 
   const receitasFixadas = todasReceitas.map(x => ({ ...x, data: new Date(x.data) }));
-  const fixasFixadas = todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null }));
+  const fixasFixadas = todasFixas.map(x => ({ ...x, dataInicio: new Date(x.dataInicio), dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null }));
   const variaveisFixadas = todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
   const receitasVarFixadas = todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
 
@@ -141,8 +145,11 @@ export async function GET(req: NextRequest) {
   const totalDespesas = totalFixas + totalVariaveis;
   const previsao = saldoEfetivo + totalReceitas - totalDespesas;
 
-  // Breakdown por categoria (para gráficos) — pending only
+  // Breakdown por categoria (para gráficos) — pending only, must have started
   const fixasFiltradas = fixasFixadas.filter((d) => {
+    const iniAno = d.dataInicio.getUTCFullYear();
+    const iniMes = d.dataInicio.getUTCMonth() + 1;
+    if (iniAno > ano || (iniAno === ano && iniMes > mes)) return false;
     if (!d.dataProximoVencimento) return true;
     const proxAno = d.dataProximoVencimento.getUTCFullYear();
     const proxMes = d.dataProximoVencimento.getUTCMonth() + 1;
