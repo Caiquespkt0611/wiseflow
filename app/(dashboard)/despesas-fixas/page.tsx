@@ -112,11 +112,13 @@ export default function DespesasFixasPage() {
     return dataInicio <= fim;
   };
 
-  // Item was paid for selected month: next due date is strictly after this month
+  // Item was paid for selected month: next due date (UTC) is in a month after this one
   const isPagaInMonth = (item: DespesaFixa): boolean => {
     if (!item.dataProximoVencimento) return false;
     const prox = new Date(item.dataProximoVencimento);
-    return prox > fim;
+    const proxAno = prox.getUTCFullYear();
+    const proxMes = prox.getUTCMonth() + 1;
+    return proxAno > ano || (proxAno === ano && proxMes > mes);
   };
 
   const sorters: Partial<Record<string, (i: DespesaFixa) => string | number>> = {

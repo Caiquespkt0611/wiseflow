@@ -15,6 +15,8 @@ interface CategoriaItem {
 
 interface DashboardData {
   totalReceitas: number;
+  totalReceitasFixas: number;
+  totalReceitasVariaveis: number;
   totalDespesas: number;
   totalFixas: number;
   totalVariaveis: number;
@@ -137,7 +139,8 @@ export default function DashboardPage() {
               <h3 className="font-semibold text-gray-700 mb-4">Resumo do Mês</h3>
               <div className="space-y-3">
                 <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
-                <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
+                <Row label="Receitas Fixas Pendentes" value={data?.totalReceitasFixas ?? 0} positive />
+                <Row label="Receitas Variáveis Pendentes" value={data?.totalReceitasVariaveis ?? 0} positive />
                 <Row label="Despesas Fixas Pendentes" value={-(data?.totalFixas ?? 0)} />
                 <Row label="Despesas Variáveis Pendentes" value={-(data?.totalVariaveis ?? 0)} />
                 <div className="border-t pt-3">

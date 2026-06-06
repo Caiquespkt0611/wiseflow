@@ -133,7 +133,9 @@ export async function GET(req: NextRequest) {
   const variaveisFixadas = todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
   const receitasVarFixadas = todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
 
-  const totalReceitas = calcReceitas(receitasFixadas, inicio, fim, mes, ano) + calcReceitasVar(receitasVarFixadas, mes, ano);
+  const totalReceitasFixas = calcReceitas(receitasFixadas, inicio, fim, mes, ano);
+  const totalReceitasVariaveis = calcReceitasVar(receitasVarFixadas, mes, ano);
+  const totalReceitas = totalReceitasFixas + totalReceitasVariaveis;
   const totalFixas = calcFixas(fixasFixadas, mes, ano);
   const totalVariaveis = calcVariaveis(variaveisFixadas, mes, ano);
   const totalDespesas = totalFixas + totalVariaveis;
@@ -168,6 +170,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     totalReceitas,
+    totalReceitasFixas,
+    totalReceitasVariaveis,
     totalDespesas,
     totalFixas,
     totalVariaveis,
