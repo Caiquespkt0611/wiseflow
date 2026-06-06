@@ -121,7 +121,7 @@ export default function DespesasVariaveisPage() {
   const isConfirmada = (item: DespesaVariavel) => {
     if (!item.confirmadaAte) return false;
     const c = new Date(item.confirmadaAte);
-    return c.getFullYear() === now.getFullYear() && c.getMonth() === now.getMonth();
+    return c.getUTCFullYear() === now.getFullYear() && c.getUTCMonth() === now.getMonth();
   };
 
   const pendentes = ativas.filter((i) => !isConfirmada(i));

@@ -65,11 +65,18 @@ export default function DespesasFixasPage() {
   };
 
   const handleConfirmar = async (item: DespesaFixa) => {
-    // Avança dataProximoVencimento para o 1º do próximo mês
-    const base = item.dataProximoVencimento
-      ? new Date(item.dataProximoVencimento)
-      : new Date();
-    const proximo = addMonths(new Date(base.getFullYear(), base.getMonth(), 1), 1);
+    let year: number;
+    let month: number;
+    if (item.dataProximoVencimento) {
+      const d = new Date(item.dataProximoVencimento);
+      year = d.getUTCFullYear();
+      month = d.getUTCMonth();
+    } else {
+      const d = new Date();
+      year = d.getFullYear();
+      month = d.getMonth();
+    }
+    const proximo = addMonths(new Date(year, month, 1), 1);
     await fetch(`/api/despesas-fixas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -87,21 +94,25 @@ export default function DespesasFixasPage() {
     ? { ...selected, dataInicio: format(new Date(selected.dataInicio), "yyyy-MM-dd") }
     : undefined;
 
-  // Mostra apenas ativas; separa pagas do mês
   const now = new Date();
-  const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  const isPaga = (item: DespesaFixa) => {
+    if (!item.dataProximoVencimento) return false;
+    const v = new Date(item.dataProximoVencimento);
+    return (
+      v.getUTCFullYear() > now.getFullYear() ||
+      (v.getUTCFullYear() === now.getFullYear() && v.getUTCMonth() > now.getMonth())
+    );
+  };
+
   const ativas = items.filter((i) => i.ativa).filter(
     (i) =>
       !filtro ||
       i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
       i.responsavel.toLowerCase().includes(filtro.toLowerCase())
   );
-  const pendentes = ativas.filter(
-    (i) => !i.dataProximoVencimento || new Date(i.dataProximoVencimento) <= fimMes
-  );
-  const pagas = ativas.filter(
-    (i) => i.dataProximoVencimento && new Date(i.dataProximoVencimento) > fimMes
-  );
+  const pendentes = ativas.filter((i) => !isPaga(i));
+  const pagas = ativas.filter((i) => isPaga(i));
 
   const totalPendentes = pendentes.reduce((sum, i) => sum + i.valor, 0);
 
