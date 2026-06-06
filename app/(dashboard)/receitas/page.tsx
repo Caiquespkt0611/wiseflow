@@ -124,14 +124,9 @@ export default function ReceitasPage() {
     });
 
     if (res.ok) {
-      const feriasDate = new Date(feriasConfirm.data);
-      const feriasDay = feriasDate.getUTCDate();
-      const feriasYear = feriasDate.getUTCFullYear();
-      const feriasMonthIdx = feriasDate.getUTCMonth();
-
-      const feriasMesKey = `${feriasYear}-${String(feriasMonthIdx + 1).padStart(2, "0")}`;
-      const nextDate = new Date(Date.UTC(feriasYear, feriasMonthIdx + 1, 1));
-      const nextMesKey = `${nextDate.getUTCFullYear()}-${String(nextDate.getUTCMonth() + 1).padStart(2, "0")}`;
+      const feriasStart = new Date(feriasConfirm.data);
+      const feriasEnd = new Date(feriasStart);
+      feriasEnd.setUTCDate(feriasEnd.getUTCDate() + 35);
 
       const salarios = items.filter(
         (i) => i.recorrente && i.ativa && (i.tipo === "Salário" || i.tipo === "Adiantamento")
@@ -139,12 +134,26 @@ export default function ReceitasPage() {
 
       for (const salario of salarios) {
         const salarioDay = new Date(salario.data).getUTCDate();
-        const exceptionKey = salarioDay < feriasDay ? nextMesKey : feriasMesKey;
-        if (!(salario.excecoes ?? []).includes(exceptionKey)) {
+        const newExcecoes = [...(salario.excecoes ?? [])];
+
+        // First occurrence of this salary on or after férias start
+        let checkDate = new Date(Date.UTC(feriasStart.getUTCFullYear(), feriasStart.getUTCMonth(), salarioDay));
+        if (checkDate < feriasStart) {
+          checkDate = new Date(Date.UTC(checkDate.getUTCFullYear(), checkDate.getUTCMonth() + 1, salarioDay));
+        }
+
+        // Suppress every occurrence that falls within the 35-day vacation window
+        while (checkDate <= feriasEnd) {
+          const excKey = `${checkDate.getUTCFullYear()}-${String(checkDate.getUTCMonth() + 1).padStart(2, "0")}`;
+          if (!newExcecoes.includes(excKey)) newExcecoes.push(excKey);
+          checkDate = new Date(Date.UTC(checkDate.getUTCFullYear(), checkDate.getUTCMonth() + 1, salarioDay));
+        }
+
+        if (newExcecoes.length > (salario.excecoes ?? []).length) {
           await fetch(`/api/receitas/${salario.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ excecoes: [...(salario.excecoes ?? []), exceptionKey] }),
+            body: JSON.stringify({ excecoes: newExcecoes }),
           });
         }
       }
@@ -470,10 +479,10 @@ export default function ReceitasPage() {
           <div className="space-y-4">
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
               <p className="font-semibold mb-2">Atenção: impacto nas receitas recorrentes</p>
-              <p>Ao confirmar, o sistema irá registrar as férias e <strong>aplicar automaticamente exceções</strong> nos meses de Salário e Adiantamento afetados:</p>
+              <p>Ao confirmar, o sistema irá registrar as férias e <strong>suprimir automaticamente</strong> todos os vencimentos de Salário e Adiantamento que caírem dentro dos <strong>35 dias seguintes</strong> à data de início das férias.</p>
               <ul className="mt-2 space-y-1 list-disc pl-4">
-                <li>Receitas com dia de recebimento <strong>anterior</strong> ao início das férias: a parcela do mês seguinte será desconsiderada.</li>
-                <li>Receitas com dia de recebimento <strong>igual ou posterior</strong> ao início das férias: a parcela do próprio mês será desconsiderada.</li>
+                <li>Ex: férias em 01/out → janela vai até 05/nov → suprime adiantamento (20/out) e salário (05/nov).</li>
+                <li>Se um vencimento cair antes do início das férias, o próximo mês é verificado.</li>
               </ul>
               <p className="mt-2 text-xs text-amber-600">Você pode desfazer qualquer exceção manualmente na lista de receitas.</p>
             </div>
