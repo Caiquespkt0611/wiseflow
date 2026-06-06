@@ -6,6 +6,7 @@ import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
 import { DespesaFixaForm, DespesaFixaFormData } from "@/components/forms/DespesaFixaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
 
 interface DespesaFixa {
   id: string;
@@ -25,6 +26,7 @@ export default function DespesasFixasPage() {
   const [selected, setSelected] = useState<DespesaFixa | null>(null);
   const [saving, setSaving] = useState(false);
   const [filtro, setFiltro] = useState("");
+  const [sort, setSort] = useState<SortState>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -105,11 +107,22 @@ export default function DespesasFixasPage() {
     );
   };
 
-  const ativas = items.filter((i) => i.ativa).filter(
-    (i) =>
-      !filtro ||
-      i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
-      i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+  const sorters: Partial<Record<string, (i: DespesaFixa) => string | number>> = {
+    descricao: (i) => i.descricao.toLowerCase(),
+    responsavel: (i) => i.responsavel.toLowerCase(),
+    dataInicio: (i) => i.dataInicio,
+    valor: (i) => i.valor,
+  };
+
+  const ativas = sortList(
+    items.filter((i) => i.ativa).filter(
+      (i) =>
+        !filtro ||
+        i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+        i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+    ),
+    sort,
+    sorters
   );
   const pendentes = ativas.filter((i) => !isPaga(i));
   const pagas = ativas.filter((i) => isPaga(i));
@@ -159,11 +172,12 @@ export default function DespesasFixasPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {["Descrição", "Responsável", "Início", "Valor/mês", "Status", ""].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
+                  <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Início" col="dataInicio" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Valor/mês" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

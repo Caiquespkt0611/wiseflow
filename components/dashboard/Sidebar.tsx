@@ -8,6 +8,7 @@ import {
   TrendingUp,
   LayoutDashboard,
   ArrowDownCircle,
+  ArrowUpCircle,
   MinusCircle,
   CreditCard,
   BarChart3,
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/receitas", label: "Receitas", icon: ArrowDownCircle },
+  { href: "/receitas-variaveis", label: "Receitas Variáveis", icon: ArrowUpCircle },
   { href: "/despesas-fixas", label: "Despesas Fixas", icon: MinusCircle },
   { href: "/despesas-variaveis", label: "Despesas Variáveis", icon: CreditCard },
   { href: "/contas", label: "Contas Bancárias", icon: Landmark },

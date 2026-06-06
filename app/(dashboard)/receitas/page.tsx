@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { ReceitaForm, ReceitaPayload } from "@/components/forms/ReceitaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
 
 interface Receita {
   id: string;
@@ -64,6 +65,7 @@ export default function ReceitasPage() {
   const [skipModal, setSkipModal] = useState<Receita | null>(null);
   const [skipMes, setSkipMes] = useState("");
   const [filtro, setFiltro] = useState("");
+  const [sort, setSort] = useState<SortState>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -174,16 +176,28 @@ export default function ReceitasPage() {
     );
   };
 
+  const sorters: Partial<Record<string, (i: Receita) => string | number>> = {
+    descricao: (i) => i.descricao.toLowerCase(),
+    tipo: (i) => i.tipo.toLowerCase(),
+    responsavel: (i) => i.responsavel.toLowerCase(),
+    data: (i) => i.data,
+    valor: (i) => i.valor,
+  };
+
   const ativos = items.filter(isItemAtivo);
   const filtrar = (list: Receita[]) =>
-    filtro
-      ? list.filter(
-          (i) =>
-            i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
-            i.tipo.toLowerCase().includes(filtro.toLowerCase()) ||
-            i.responsavel.toLowerCase().includes(filtro.toLowerCase())
-        )
-      : list;
+    sortList(
+      filtro
+        ? list.filter(
+            (i) =>
+              i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+              i.tipo.toLowerCase().includes(filtro.toLowerCase()) ||
+              i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+          )
+        : list,
+      sort,
+      sorters
+    );
 
   const pendentes = filtrar(ativos.filter((i) => !isRecebida(i)));
   const recebidas = filtrar([
@@ -227,11 +241,13 @@ export default function ReceitasPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {["Descrição", "Tipo", "Responsável", "Data", "Valor", "Status", ""].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
+                  <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Tipo" col="tipo" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Data" col="data" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Valor" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

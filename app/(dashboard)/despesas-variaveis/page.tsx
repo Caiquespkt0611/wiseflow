@@ -6,6 +6,7 @@ import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
 import { DespesaVariavelForm, DespesaVariavelPayload } from "@/components/forms/DespesaVariavelForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
 
 interface DespesaVariavel {
   id: string;
@@ -28,6 +29,7 @@ export default function DespesasVariaveisPage() {
   const [selected, setSelected] = useState<DespesaVariavel | null>(null);
   const [saving, setSaving] = useState(false);
   const [filtro, setFiltro] = useState("");
+  const [sort, setSort] = useState<SortState>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -104,14 +106,26 @@ export default function DespesasVariaveisPage() {
     return item.parcelaAtual + diffMeses;
   };
 
-  const itensFiltrados = filtro
-    ? items.filter(
-        (i) =>
-          i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
-          i.cartao.toLowerCase().includes(filtro.toLowerCase()) ||
-          i.responsavel.toLowerCase().includes(filtro.toLowerCase())
-      )
-    : items;
+  const sorters: Partial<Record<string, (i: DespesaVariavel) => string | number>> = {
+    descricao: (i) => i.descricao.toLowerCase(),
+    cartao: (i) => i.cartao.toLowerCase(),
+    responsavel: (i) => i.responsavel.toLowerCase(),
+    valorParcela: (i) => i.valorParcela,
+    dataInicio: (i) => i.dataInicio,
+  };
+
+  const itensFiltrados = sortList(
+    filtro
+      ? items.filter(
+          (i) =>
+            i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+            i.cartao.toLowerCase().includes(filtro.toLowerCase()) ||
+            i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+        )
+      : items,
+    sort,
+    sorters
+  );
 
   const ativas = itensFiltrados.filter((item) => getParcelaAtual(item) <= item.parcelasTotal);
   const concluidas = itensFiltrados.filter((item) => getParcelaAtual(item) > item.parcelasTotal);
@@ -170,11 +184,13 @@ export default function DespesasVariaveisPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {["Descrição", "Cartão", "Responsável", "Parcelas", "Valor Parcela", "Próximo Vencimento", ""].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
+                  <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Cartão" col="cartao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Parcelas</th>
+                  <SortTh label="Valor Parcela" col="valorParcela" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <SortTh label="Próximo Vencimento" col="dataInicio" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

@@ -14,10 +14,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  receitas          Receita[]
-  despesasFixas     DespesaFixa[]
-  despesasVariaveis DespesaVariavel[]
-  contasBancarias   ContaBancaria[]
+  receitas           Receita[]
+  receitasVariaveis  ReceitaVariavel[]
+  despesasFixas      DespesaFixa[]
+  despesasVariaveis  DespesaVariavel[]
+  contasBancarias    ContaBancaria[]
 
   @@map("users")
 }
@@ -73,6 +74,27 @@ model DespesaFixa {
 
   @@index([userId])
   @@map("despesas_fixas")
+}
+
+model ReceitaVariavel {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  descricao     String
+  fonte         String
+  categoria     String    @default("Outros")
+  valorTotal    Float
+  parcelaAtual  Int
+  parcelasTotal Int
+  valorParcela  Float
+  responsavel   String
+  dataInicio    DateTime
+  confirmadaAte DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("receitas_variaveis")
 }
 
 model DespesaVariavel {
