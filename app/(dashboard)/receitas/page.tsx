@@ -68,10 +68,7 @@ export default function ReceitasPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/receitas");
-    if (res.ok) {
-      const all: Receita[] = await res.json();
-      setItems(all.filter(isItemAtivo));
-    }
+    if (res.ok) setItems(await res.json());
     setLoading(false);
   }, []);
 
@@ -107,20 +104,16 @@ export default function ReceitasPage() {
   };
 
   const handleReceber = async (item: Receita) => {
-    if (item.recorrente) {
-      const proxData = addMonths(new Date(item.data), 1);
-      await fetch(`/api/receitas/${item.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: format(proxData, "yyyy-MM-dd") }),
-      });
-    } else {
-      await fetch(`/api/receitas/${item.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ativa: false }),
-      });
-    }
+    const d = new Date(item.data);
+    const proxData = addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
+    const payload = item.recorrente
+      ? { data: format(proxData, "yyyy-MM-dd") }
+      : { data: format(proxData, "yyyy-MM-dd"), ativa: false };
+    await fetch(`/api/receitas/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     fetchData();
   };
 
@@ -170,14 +163,33 @@ export default function ReceitasPage() {
       }
     : undefined;
 
-  const itemsFiltrados = filtro
-    ? items.filter(
-        (i) =>
-          i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
-          i.tipo.toLowerCase().includes(filtro.toLowerCase()) ||
-          i.responsavel.toLowerCase().includes(filtro.toLowerCase())
-      )
-    : items;
+  const now = new Date();
+
+  const isRecebida = (item: Receita) => {
+    if (item.parcelada) return false;
+    const d = new Date(item.data);
+    return (
+      d.getUTCFullYear() > now.getFullYear() ||
+      (d.getUTCFullYear() === now.getFullYear() && d.getUTCMonth() > now.getMonth())
+    );
+  };
+
+  const ativos = items.filter(isItemAtivo);
+  const filtrar = (list: Receita[]) =>
+    filtro
+      ? list.filter(
+          (i) =>
+            i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+            i.tipo.toLowerCase().includes(filtro.toLowerCase()) ||
+            i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+        )
+      : list;
+
+  const pendentes = filtrar(ativos.filter((i) => !isRecebida(i)));
+  const recebidas = filtrar([
+    ...ativos.filter(isRecebida),
+    ...items.filter((i) => !i.ativa && isRecebida(i)),
+  ]);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -195,7 +207,7 @@ export default function ReceitasPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : items.length === 0 ? (
+        ) : ativos.length === 0 ? (
           <div className="p-8 text-center text-gray-400">Nenhuma receita cadastrada</div>
         ) : (
           <>
@@ -223,85 +235,107 @@ export default function ReceitasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {itemsFiltrados.length === 0 ? (
+                {pendentes.length === 0 && recebidas.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
                       Nenhum resultado encontrado
                     </td>
                   </tr>
-                ) : itemsFiltrados.map((item) => {
-                  const proximasExcecoes = getProximasExcecoes(item);
-                  return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{item.tipo}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.data)}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-emerald-600">
-                        {formatCurrency(item.valor)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          {item.recorrente && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full w-fit">
-                              <RefreshCw className="w-3 h-3" /> Recorrente
-                            </span>
-                          )}
-                          {item.parcelada && item.mesesTotal && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full w-fit">
-                              Mês {getParcelaAtual(item)}/{item.mesesTotal}
-                            </span>
-                          )}
-                          {proximasExcecoes.map((mesKey) => {
-                            const [ano, mes] = mesKey.split("-");
-                            const label = format(new Date(Number(ano), Number(mes) - 1, 1), "MMM/yy", { locale: ptBR });
-                            return (
-                              <span key={mesKey} className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full w-fit">
-                                <CalendarX className="w-3 h-3" />
-                                Pulado {label}
-                                <button
-                                  onClick={() => handleRemoverExcecao(item, mesKey)}
-                                  className="ml-0.5 hover:text-orange-800"
-                                  title="Desfazer"
-                                >
-                                  <X className="w-2.5 h-2.5" />
+                ) : (
+                  <>
+                    {pendentes.map((item) => {
+                      const proximasExcecoes = getProximasExcecoes(item);
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{item.tipo}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.data)}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-emerald-600">{formatCurrency(item.valor)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1">
+                              {item.recorrente && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full w-fit">
+                                  <RefreshCw className="w-3 h-3" /> Recorrente
+                                </span>
+                              )}
+                              {item.parcelada && item.mesesTotal && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full w-fit">
+                                  Mês {getParcelaAtual(item)}/{item.mesesTotal}
+                                </span>
+                              )}
+                              {proximasExcecoes.map((mesKey) => {
+                                const [ano, mes] = mesKey.split("-");
+                                const label = format(new Date(Number(ano), Number(mes) - 1, 1), "MMM/yy", { locale: ptBR });
+                                return (
+                                  <span key={mesKey} className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full w-fit">
+                                    <CalendarX className="w-3 h-3" />
+                                    Pulado {label}
+                                    <button onClick={() => handleRemoverExcecao(item, mesKey)} className="ml-0.5 hover:text-orange-800" title="Desfazer">
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              {!item.parcelada && (
+                                <button onClick={() => handleReceber(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
+                                  <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                                 </button>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {!item.parcelada && (
-                            <button
-                              onClick={() => handleReceber(item)}
-                              title="Confirmar recebimento"
-                              className="p-1.5 hover:bg-emerald-50 rounded-lg group"
-                            >
-                              <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                            </button>
-                          )}
-                          {item.recorrente && (
-                            <button
-                              onClick={() => { setSkipModal(item); setSkipMes(""); }}
-                              title="Pular mês"
-                              className="p-1.5 hover:bg-orange-50 rounded-lg group"
-                            >
-                              <CalendarX className="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" />
-                            </button>
-                          )}
-                          <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                            <Pencil className="w-4 h-4 text-gray-500" />
-                          </button>
-                          <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                            <Trash2 className="w-4 h-4 text-red-400" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                              )}
+                              {item.recorrente && (
+                                <button onClick={() => { setSkipModal(item); setSkipMes(""); }} title="Pular mês" className="p-1.5 hover:bg-orange-50 rounded-lg group">
+                                  <CalendarX className="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                                </button>
+                              )}
+                              <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                                <Pencil className="w-4 h-4 text-gray-500" />
+                              </button>
+                              <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
+                                <Trash2 className="w-4 h-4 text-red-400" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {recebidas.length > 0 && (
+                      <>
+                        <tr>
+                          <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
+                            Recebidas este mês
+                          </td>
+                        </tr>
+                        {recebidas.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{item.tipo}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.data)}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-400">{formatCurrency(item.valor)}</td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Recebida</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                                  <Pencil className="w-4 h-4 text-gray-400" />
+                                </button>
+                                <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
+                                  <Trash2 className="w-4 h-4 text-red-300" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
               </tbody>
             </table>
           </div>
