@@ -7,10 +7,13 @@ import { prisma } from "@/lib/prisma";
 const schema = z.object({
   descricao: z.string().min(1).optional(),
   tipo: z.string().min(1).optional(),
-  valor: z.number().positive().optional(),
+  valor: z.number().optional(),
   data: z.string().optional(),
   responsavel: z.string().min(1).optional(),
   recorrente: z.boolean().optional(),
+  parcelada: z.boolean().optional(),
+  mesesTotal: z.number().int().positive().optional().nullable(),
+  excecoes: z.array(z.string()).optional(),
   ativa: z.boolean().optional(),
 });
 

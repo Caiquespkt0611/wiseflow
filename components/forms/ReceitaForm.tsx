@@ -7,18 +7,35 @@ import { z } from "zod";
 const schema = z.object({
   descricao: z.string().min(1, "Obrigatório"),
   tipo: z.string().min(1, "Obrigatório"),
-  valor: z.coerce.number().positive("Valor deve ser positivo"),
+  valor: z.coerce.number().refine((v) => v !== 0, "Valor não pode ser zero"),
   data: z.string().min(1, "Obrigatório"),
   responsavel: z.string().min(1, "Obrigatório"),
-  recorrente: z.boolean(),
+  recorrencia: z.enum(["unica", "recorrente", "parcelada"]),
+  mesesTotal: z.coerce.number().int().min(2, "Mínimo 2 meses").optional(),
   ativa: z.boolean(),
-});
+}).refine(
+  (d) => d.recorrencia !== "parcelada" || (d.mesesTotal && d.mesesTotal >= 2),
+  { message: "Informe a quantidade de meses (mínimo 2)", path: ["mesesTotal"] }
+);
 
 export type ReceitaFormData = z.infer<typeof schema>;
 
+export type ReceitaPayload = {
+  descricao: string;
+  tipo: string;
+  valor: number;
+  data: string;
+  responsavel: string;
+  recorrente: boolean;
+  parcelada: boolean;
+  mesesTotal?: number | null;
+  excecoes: string[];
+  ativa: boolean;
+};
+
 interface Props {
   defaultValues?: Partial<ReceitaFormData>;
-  onSubmit: (data: ReceitaFormData) => Promise<void>;
+  onSubmit: (data: ReceitaPayload) => Promise<void>;
   loading?: boolean;
 }
 
@@ -28,14 +45,33 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<ReceitaFormData>({
     resolver: zodResolver(schema) as Resolver<ReceitaFormData>,
-    defaultValues: { ativa: true, recorrente: false, ...defaultValues },
+    defaultValues: { ativa: true, recorrencia: "unica", ...defaultValues },
   });
 
+  const recorrencia = watch("recorrencia");
+
+  const handleFormSubmit = (data: ReceitaFormData) => {
+    const payload: ReceitaPayload = {
+      descricao: data.descricao,
+      tipo: data.tipo,
+      valor: data.valor,
+      data: data.data,
+      responsavel: data.responsavel,
+      recorrente: data.recorrencia === "recorrente",
+      parcelada: data.recorrencia === "parcelada",
+      mesesTotal: data.recorrencia === "parcelada" ? data.mesesTotal : null,
+      excecoes: [],
+      ativa: data.ativa,
+    };
+    return onSubmit(payload);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Field label="Descrição" error={errors.descricao?.message}>
         <input {...register("descricao")} className={inputClass} placeholder="Ex: Salário mensal" />
       </Field>
@@ -51,7 +87,7 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
         <Field label="Valor (R$)" error={errors.valor?.message}>
           <input {...register("valor")} type="number" step="0.01" className={inputClass} placeholder="0,00" />
         </Field>
-        <Field label="Data" error={errors.data?.message}>
+        <Field label="Data início" error={errors.data?.message}>
           <input {...register("data")} type="date" className={inputClass} />
         </Field>
       </div>
@@ -60,16 +96,35 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
         <input {...register("responsavel")} className={inputClass} placeholder="Nome do responsável" />
       </Field>
 
-      <div className="flex gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input {...register("recorrente")} type="checkbox" className="rounded" />
-          Recorrente (mensal)
-        </label>
+      <Field label="Tipo de recorrência" error={errors.recorrencia?.message}>
+        <div className="flex gap-2">
+          {(["unica", "recorrente", "parcelada"] as const).map((opt) => (
+            <label key={opt} className={`flex-1 flex items-center justify-center gap-1.5 border rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors ${recorrencia === opt ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-medium" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+              <input {...register("recorrencia")} type="radio" value={opt} className="sr-only" />
+              {opt === "unica" ? "Única" : opt === "recorrente" ? "Recorrente" : "Parcelada"}
+            </label>
+          ))}
+        </div>
+      </Field>
+
+      {recorrencia === "parcelada" && (
+        <Field label="Quantidade de meses" error={errors.mesesTotal?.message}>
+          <input
+            {...register("mesesTotal")}
+            type="number"
+            min={2}
+            className={inputClass}
+            placeholder="Ex: 10"
+          />
+        </Field>
+      )}
+
+      {defaultValues && (
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input {...register("ativa")} type="checkbox" className="rounded" />
           Ativa
         </label>
-      </div>
+      )}
 
       <button
         type="submit"

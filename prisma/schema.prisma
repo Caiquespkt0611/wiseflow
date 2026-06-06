@@ -45,6 +45,9 @@ model Receita {
   data        DateTime
   responsavel String
   recorrente  Boolean  @default(false)
+  parcelada   Boolean  @default(false)
+  mesesTotal  Int?
+  excecoes    String[] @default([])
   ativa       Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

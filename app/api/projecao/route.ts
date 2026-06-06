@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const totalMeses = (12 - mesBase + 1) + 12;
 
   const [receitas, despesasFixas, despesasVariaveis, contasBancarias] = await Promise.all([
-    prisma.receita.findMany({ where: { userId: session.user.id, ativa: true } }),
+    prisma.receita.findMany({ where: { userId: session.user.id, ativa: true }, }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
     prisma.contaBancaria.findMany({ where: { userId: session.user.id } }),
@@ -34,9 +34,21 @@ export async function GET(req: NextRequest) {
     const inicio = new Date(ano, mes - 1, 1);
     const fim = new Date(ano, mes, 0, 23, 59, 59);
 
+    const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
+
     const totalReceitas = receitas
       .filter((r) => {
-        if (r.recorrente) return new Date(r.data) <= fim;
+        if (r.parcelada && r.mesesTotal) {
+          const dataInicio = new Date(r.data);
+          const diffMeses =
+            (ano - dataInicio.getFullYear()) * 12 + (mes - 1 - dataInicio.getMonth());
+          return diffMeses >= 0 && diffMeses < r.mesesTotal;
+        }
+        if (r.recorrente) {
+          if (new Date(r.data) > fim) return false;
+          if ((r.excecoes as string[])?.includes(mesKey)) return false;
+          return true;
+        }
         const data = new Date(r.data);
         return data >= inicio && data <= fim;
       })
