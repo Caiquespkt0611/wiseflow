@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, CalendarX, X, Search } from "lucide-react";
-import { format, addMonths, differenceInCalendarMonths } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
+import { MonthSelector } from "@/components/ui/MonthSelector";
 import { ReceitaForm, ReceitaPayload } from "@/components/forms/ReceitaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
@@ -32,25 +33,6 @@ function getRecorrencia(item: Receita): RecorrenciaOpt {
   return "unica";
 }
 
-function getParcelaAtual(item: Receita): number {
-  const dataInicio = new Date(item.data);
-  const today = new Date();
-  const diff = differenceInCalendarMonths(today, dataInicio);
-  return Math.min(Math.max(diff + 1, 1), item.mesesTotal ?? 1);
-}
-
-function isParceladaAtiva(item: Receita): boolean {
-  if (!item.parcelada || !item.mesesTotal) return false;
-  const dataFim = addMonths(new Date(item.data), item.mesesTotal);
-  return new Date() < dataFim;
-}
-
-function isItemAtivo(item: Receita): boolean {
-  if (!item.ativa) return false;
-  if (item.parcelada) return isParceladaAtiva(item);
-  return true;
-}
-
 function getProximasExcecoes(item: Receita): string[] {
   if (!item.recorrente || !item.excecoes?.length) return [];
   const hoje = format(new Date(), "yyyy-MM");
@@ -68,6 +50,15 @@ export default function ReceitasPage() {
   const [filtro, setFiltro] = useState("");
   const [sort, setSort] = useState<SortState>(null);
   const [feriasConfirm, setFeriasConfirm] = useState<ReceitaPayload | null>(null);
+  const [date, setDate] = useState(new Date());
+
+  const mes = date.getMonth() + 1;
+  const ano = date.getFullYear();
+  const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
+  const fim = new Date(ano, mes, 0, 23, 59, 59);
+  const now = new Date();
+  const isCurrentMonth = now.getMonth() + 1 === mes && now.getFullYear() === ano;
+  const mesLabel = format(date, "MMM/yy", { locale: ptBR });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -77,6 +68,34 @@ export default function ReceitasPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const isActiveInMonth = (item: Receita): boolean => {
+    if (!item.ativa) return false;
+    const data = new Date(item.data);
+    if (item.parcelada && item.mesesTotal) {
+      const diffMeses = (ano - data.getUTCFullYear()) * 12 + (mes - 1 - data.getUTCMonth());
+      return diffMeses >= 0 && diffMeses < item.mesesTotal;
+    }
+    if (item.recorrente) {
+      if (data > fim) return false;
+      if ((item.excecoes ?? []).includes(mesKey)) return false;
+      return true;
+    }
+    // one-time: check if data is in selected month
+    return data.getUTCFullYear() === ano && data.getUTCMonth() + 1 === mes;
+  };
+
+  const isRecebidaInMonth = (item: Receita): boolean => {
+    if (!item.confirmadaAte) return false;
+    const c = new Date(item.confirmadaAte);
+    return c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes;
+  };
+
+  const getParcelaAtualForMonth = (item: Receita): number => {
+    const d = new Date(item.data);
+    const diff = (ano - d.getUTCFullYear()) * 12 + (mes - 1 - d.getUTCMonth());
+    return Math.min(Math.max(diff + 1, 1), item.mesesTotal ?? 1);
+  };
 
   const handleCreate = async (data: ReceitaPayload) => {
     if (data.tipo === "Férias") {
@@ -157,7 +176,7 @@ export default function ReceitasPage() {
   const handleReceber = async (item: Receita) => {
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
     if (item.parcelada) {
-      const isLast = getParcelaAtual(item) >= (item.mesesTotal ?? 1);
+      const isLast = getParcelaAtualForMonth(item) >= (item.mesesTotal ?? 1);
       const payload = isLast ? { confirmadaAte, ativa: false } : { confirmadaAte };
       await fetch(`/api/receitas/${item.id}`, {
         method: "PUT",
@@ -198,8 +217,8 @@ export default function ReceitasPage() {
     fetchData();
   };
 
-  const handleRemoverExcecao = async (item: Receita, mesKey: string) => {
-    const updated = (item.excecoes ?? []).filter((e) => e !== mesKey);
+  const handleRemoverExcecao = async (item: Receita, mesKeyExc: string) => {
+    const updated = (item.excecoes ?? []).filter((e) => e !== mesKeyExc);
     await fetch(`/api/receitas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -226,14 +245,6 @@ export default function ReceitasPage() {
       }
     : undefined;
 
-  const now = new Date();
-
-  const isRecebida = (item: Receita) => {
-    if (!item.confirmadaAte) return false;
-    const c = new Date(item.confirmadaAte);
-    return c.getUTCFullYear() === now.getFullYear() && c.getUTCMonth() === now.getMonth();
-  };
-
   const sorters: Partial<Record<string, (i: Receita) => string | number>> = {
     descricao: (i) => i.descricao.toLowerCase(),
     tipo: (i) => i.tipo.toLowerCase(),
@@ -242,7 +253,6 @@ export default function ReceitasPage() {
     valor: (i) => i.valor,
   };
 
-  const ativos = items.filter(isItemAtivo);
   const filtrar = (list: Receita[]) =>
     sortList(
       filtro
@@ -257,29 +267,34 @@ export default function ReceitasPage() {
       sorters
     );
 
-  const pendentes = filtrar(ativos.filter((i) => !isRecebida(i)));
-  const recebidas = filtrar([
-    ...ativos.filter(isRecebida),
-    ...items.filter((i) => !i.ativa && isRecebida(i)),
-  ]);
+  const ativos = items.filter(isActiveInMonth);
+  const confirmadasFora = items.filter((i) => !isActiveInMonth(i) && isRecebidaInMonth(i));
+
+  const pendentes = filtrar(ativos.filter((i) => !isRecebidaInMonth(i)));
+  const recebidas = filtrar([...ativos.filter(isRecebidaInMonth), ...confirmadasFora]);
+
+  const isEmpty = pendentes.length === 0 && recebidas.length === 0;
 
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Receitas Fixas</h1>
-        <button
-          onClick={() => setModal("create")}
-          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Receita Fixa
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <MonthSelector date={date} onChange={setDate} />
+          <button
+            onClick={() => setModal("create")}
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Receita Fixa
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : ativos.length === 0 ? (
+        ) : items.filter((i) => i.ativa).length === 0 ? (
           <div className="p-8 text-center text-gray-400">Nenhuma receita cadastrada</div>
         ) : (
           <>
@@ -295,28 +310,26 @@ export default function ReceitasPage() {
                 />
               </div>
             </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Tipo" col="tipo" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Data" col="data" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Valor" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {pendentes.length === 0 && recebidas.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
-                      Nenhum resultado encontrado
-                    </td>
-                  </tr>
-                ) : (
-                  <>
+
+            {isEmpty ? (
+              <div className="p-8 text-center text-gray-400 text-sm">
+                Nenhuma receita fixa em {mesLabel}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Tipo" col="tipo" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Data" col="data" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Valor" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
                     {pendentes.map((item) => {
                       const proximasExcecoes = getProximasExcecoes(item);
                       return (
@@ -335,17 +348,17 @@ export default function ReceitasPage() {
                               )}
                               {item.parcelada && item.mesesTotal && (
                                 <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full w-fit">
-                                  Mês {getParcelaAtual(item)}/{item.mesesTotal}
+                                  Mês {getParcelaAtualForMonth(item)}/{item.mesesTotal}
                                 </span>
                               )}
-                              {proximasExcecoes.map((mesKey) => {
-                                const [ano, mes] = mesKey.split("-");
-                                const label = format(new Date(Number(ano), Number(mes) - 1, 1), "MMM/yy", { locale: ptBR });
+                              {proximasExcecoes.map((exc) => {
+                                const [excAno, excMes] = exc.split("-");
+                                const label = format(new Date(Number(excAno), Number(excMes) - 1, 1), "MMM/yy", { locale: ptBR });
                                 return (
-                                  <span key={mesKey} className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full w-fit">
+                                  <span key={exc} className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full w-fit">
                                     <CalendarX className="w-3 h-3" />
                                     Pulado {label}
-                                    <button onClick={() => handleRemoverExcecao(item, mesKey)} className="ml-0.5 hover:text-orange-800" title="Desfazer">
+                                    <button onClick={() => handleRemoverExcecao(item, exc)} className="ml-0.5 hover:text-orange-800" title="Desfazer">
                                       <X className="w-2.5 h-2.5" />
                                     </button>
                                   </span>
@@ -355,10 +368,12 @@ export default function ReceitasPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <button onClick={() => handleReceber(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
-                                <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                              </button>
-                              {item.recorrente && (
+                              {isCurrentMonth && (
+                                <button onClick={() => handleReceber(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
+                                  <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                                </button>
+                              )}
+                              {item.recorrente && isCurrentMonth && (
                                 <button onClick={() => { setSkipModal(item); setSkipMes(""); }} title="Pular mês" className="p-1.5 hover:bg-orange-50 rounded-lg group">
                                   <CalendarX className="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" />
                                 </button>
@@ -379,7 +394,7 @@ export default function ReceitasPage() {
                       <>
                         <tr>
                           <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                            Recebidas este mês
+                            Recebidas em {mesLabel}
                           </td>
                         </tr>
                         {recebidas.map((item) => (
@@ -406,11 +421,10 @@ export default function ReceitasPage() {
                         ))}
                       </>
                     )}
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -431,7 +445,7 @@ export default function ReceitasPage() {
           <div className="space-y-4">
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
               <p className="font-semibold mb-2">Atenção: impacto nas receitas recorrentes</p>
-              <p>Ao confirmar, o sistema irá registrar as férias e <strong>aplicar automaticamente exceções</strong> nos meses de Salário e Adiantamento afetados, de acordo com a data de início informada:</p>
+              <p>Ao confirmar, o sistema irá registrar as férias e <strong>aplicar automaticamente exceções</strong> nos meses de Salário e Adiantamento afetados:</p>
               <ul className="mt-2 space-y-1 list-disc pl-4">
                 <li>Receitas com dia de recebimento <strong>anterior</strong> ao início das férias: a parcela do mês seguinte será desconsiderada.</li>
                 <li>Receitas com dia de recebimento <strong>igual ou posterior</strong> ao início das férias: a parcela do próprio mês será desconsiderada.</li>

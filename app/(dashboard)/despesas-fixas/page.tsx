@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, Search } from "lucide-react";
 import { format, addMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
+import { MonthSelector } from "@/components/ui/MonthSelector";
 import { DespesaFixaForm, DespesaFixaFormData } from "@/components/forms/DespesaFixaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
@@ -27,6 +29,14 @@ export default function DespesasFixasPage() {
   const [saving, setSaving] = useState(false);
   const [filtro, setFiltro] = useState("");
   const [sort, setSort] = useState<SortState>(null);
+  const [date, setDate] = useState(new Date());
+
+  const mes = date.getMonth() + 1;
+  const ano = date.getFullYear();
+  const fim = new Date(ano, mes, 0, 23, 59, 59);
+  const now = new Date();
+  const isCurrentMonth = now.getMonth() + 1 === mes && now.getFullYear() === ano;
+  const mesLabel = format(date, "MMM/yy", { locale: ptBR });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,15 +106,17 @@ export default function DespesasFixasPage() {
     ? { ...selected, dataInicio: selected.dataInicio.slice(0, 10) }
     : undefined;
 
-  const now = new Date();
+  // Item appeared in selected month: started before end of month
+  const isActiveInMonth = (item: DespesaFixa): boolean => {
+    const dataInicio = new Date(item.dataInicio);
+    return dataInicio <= fim;
+  };
 
-  const isPaga = (item: DespesaFixa) => {
+  // Item was paid for selected month: next due date is strictly after this month
+  const isPagaInMonth = (item: DespesaFixa): boolean => {
     if (!item.dataProximoVencimento) return false;
-    const v = new Date(item.dataProximoVencimento);
-    return (
-      v.getUTCFullYear() > now.getFullYear() ||
-      (v.getUTCFullYear() === now.getFullYear() && v.getUTCMonth() > now.getMonth())
-    );
+    const prox = new Date(item.dataProximoVencimento);
+    return prox > fim;
   };
 
   const sorters: Partial<Record<string, (i: DespesaFixa) => string | number>> = {
@@ -114,19 +126,23 @@ export default function DespesasFixasPage() {
     valor: (i) => i.valor,
   };
 
-  const ativas = sortList(
-    items.filter((i) => i.ativa).filter(
-      (i) =>
-        !filtro ||
-        i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
-        i.responsavel.toLowerCase().includes(filtro.toLowerCase())
-    ),
-    sort,
-    sorters
-  );
-  const pendentes = ativas.filter((i) => !isPaga(i));
-  const pagas = ativas.filter((i) => isPaga(i));
+  const ativas = items.filter((i) => i.ativa && isActiveInMonth(i));
 
+  const aplicarFiltro = (list: DespesaFixa[]) =>
+    sortList(
+      filtro
+        ? list.filter(
+            (i) =>
+              i.descricao.toLowerCase().includes(filtro.toLowerCase()) ||
+              i.responsavel.toLowerCase().includes(filtro.toLowerCase())
+          )
+        : list,
+      sort,
+      sorters
+    );
+
+  const pendentes = aplicarFiltro(ativas.filter((i) => !isPagaInMonth(i)));
+  const pagas = aplicarFiltro(ativas.filter((i) => isPagaInMonth(i)));
   const totalPendentes = pendentes.reduce((sum, i) => sum + i.valor, 0);
 
   return (
@@ -136,17 +152,21 @@ export default function DespesasFixasPage() {
           <h1 className="text-2xl font-bold text-gray-900">Despesas Fixas</h1>
           {!loading && (
             <p className="text-sm text-gray-500 mt-1">
-              Pendente este mês: <span className="font-medium text-red-600">{formatCurrency(totalPendentes)}</span>
+              Pendente em {mesLabel}:{" "}
+              <span className="font-medium text-red-600">{formatCurrency(totalPendentes)}</span>
             </p>
           )}
         </div>
-        <button
-          onClick={() => setModal("create")}
-          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Despesa Fixa
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <MonthSelector date={date} onChange={setDate} />
+          <button
+            onClick={() => setModal("create")}
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Despesa Fixa
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -168,85 +188,94 @@ export default function DespesasFixasPage() {
                 />
               </div>
             </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Início" col="dataInicio" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <SortTh label="Valor/mês" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {pendentes.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-red-600">{formatCurrency(item.valor)}</td>
-                    <td className="px-4 py-3">
-                      {item.recorrente && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                          <RefreshCw className="w-3 h-3" /> Recorrente
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleConfirmar(item)}
-                          title="Confirmar pagamento"
-                          className="p-1.5 hover:bg-emerald-50 rounded-lg group"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                        </button>
-                        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                          <Pencil className="w-4 h-4 text-gray-500" />
-                        </button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                          <Trash2 className="w-4 h-4 text-red-400" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
 
-                {pagas.length > 0 && (
-                  <>
+            {pendentes.length === 0 && pagas.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">
+                Nenhuma despesa fixa em {mesLabel}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      <td colSpan={6} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                        Pagas este mês
-                      </td>
+                      <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Início" col="dataInicio" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <SortTh label="Valor/mês" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                      <th className="px-4 py-3" />
                     </tr>
-                    {pagas.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {pendentes.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-400">{formatCurrency(item.valor)}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-red-600">{formatCurrency(item.valor)}</td>
                         <td className="px-4 py-3">
-                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Paga</span>
+                          {item.recorrente && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                              <RefreshCw className="w-3 h-3" /> Recorrente
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
+                            {isCurrentMonth && (
+                              <button
+                                onClick={() => handleConfirmar(item)}
+                                title="Confirmar pagamento"
+                                className="p-1.5 hover:bg-emerald-50 rounded-lg group"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                              </button>
+                            )}
                             <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                              <Pencil className="w-4 h-4 text-gray-400" />
+                              <Pencil className="w-4 h-4 text-gray-500" />
                             </button>
                             <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                              <Trash2 className="w-4 h-4 text-red-300" />
+                              <Trash2 className="w-4 h-4 text-red-400" />
                             </button>
                           </div>
                         </td>
                       </tr>
                     ))}
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
+
+                    {pagas.length > 0 && (
+                      <>
+                        <tr>
+                          <td colSpan={6} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
+                            Pagas em {mesLabel}
+                          </td>
+                        </tr>
+                        {pagas.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-400">{formatCurrency(item.valor)}</td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Paga</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                                  <Pencil className="w-4 h-4 text-gray-400" />
+                                </button>
+                                <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
+                                  <Trash2 className="w-4 h-4 text-red-300" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>
