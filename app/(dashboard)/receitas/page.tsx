@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, CalendarX, X, Search } from "lucide-react";
-import { format, addMonths } from "date-fns";
+import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, CalendarX, X, Search, RotateCcw } from "lucide-react";
+import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
@@ -191,6 +191,24 @@ export default function ReceitasPage() {
     const payload = item.recorrente
       ? { data: format(proxData, "yyyy-MM-dd"), confirmadaAte }
       : { data: format(proxData, "yyyy-MM-dd"), ativa: false, confirmadaAte };
+    await fetch(`/api/receitas/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    fetchData();
+  };
+
+  const handleReverterReceita = async (item: Receita) => {
+    const payload: Record<string, unknown> = { confirmadaAte: null };
+    if (!item.parcelada) {
+      const d = new Date(item.data);
+      const prevData = subMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
+      payload.data = format(prevData, "yyyy-MM-dd");
+    }
+    if (!item.ativa) {
+      payload.ativa = true;
+    }
     await fetch(`/api/receitas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -409,6 +427,13 @@ export default function ReceitasPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleReverterReceita(item)}
+                                  title="Desfazer recebimento"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                >
+                                  <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
+                                </button>
                                 <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                                   <Pencil className="w-4 h-4 text-gray-400" />
                                 </button>

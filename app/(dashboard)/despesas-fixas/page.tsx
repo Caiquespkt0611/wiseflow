@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, Search } from "lucide-react";
-import { format, addMonths } from "date-fns";
+import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, Search, RotateCcw } from "lucide-react";
+import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
@@ -93,6 +93,22 @@ export default function DespesasFixasPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataProximoVencimento: format(proximo, "yyyy-MM-dd") }),
+    });
+    fetchData();
+  };
+
+  const handleReverter = async (item: DespesaFixa) => {
+    if (!item.dataProximoVencimento) return;
+    const prox = new Date(item.dataProximoVencimento);
+    const prevMonth = subMonths(new Date(prox.getUTCFullYear(), prox.getUTCMonth(), 1), 1);
+    const ini = new Date(item.dataInicio);
+    const prevIsAtOrBeforeStart =
+      prevMonth.getFullYear() < ini.getUTCFullYear() ||
+      (prevMonth.getFullYear() === ini.getUTCFullYear() && prevMonth.getMonth() + 1 <= ini.getUTCMonth() + 1);
+    await fetch(`/api/despesas-fixas/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataProximoVencimento: prevIsAtOrBeforeStart ? null : format(prevMonth, "yyyy-MM-dd") }),
     });
     fetchData();
   };
@@ -264,6 +280,13 @@ export default function DespesasFixasPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleReverter(item)}
+                                  title="Desfazer pagamento"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                >
+                                  <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
+                                </button>
                                 <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                                   <Pencil className="w-4 h-4 text-gray-400" />
                                 </button>

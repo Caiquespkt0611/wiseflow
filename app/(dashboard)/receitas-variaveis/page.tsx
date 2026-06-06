@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2, Search } from "lucide-react";
-import { format, addMonths } from "date-fns";
+import { Plus, Pencil, Trash2, CheckCircle2, Search, RotateCcw } from "lucide-react";
+import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
@@ -103,6 +103,17 @@ export default function ReceitasVariaveisPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataInicio: novaData, confirmadaAte }),
+    });
+    fetchData();
+  };
+
+  const handleReverterReceitaVar = async (item: ReceitaVariavel) => {
+    const d = new Date(item.dataInicio);
+    const prevInicio = subMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
+    await fetch(`/api/receitas-variaveis/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataInicio: format(prevInicio, "yyyy-MM-dd"), confirmadaAte: null }),
     });
     fetchData();
   };
@@ -281,6 +292,13 @@ export default function ReceitasVariaveisPage() {
                               <td className="px-4 py-3 text-sm text-gray-400">{formatDate(item.dataInicio)}</td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleReverterReceitaVar(item)}
+                                    title="Desfazer recebimento"
+                                    className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                  >
+                                    <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
+                                  </button>
                                   <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                                     <Pencil className="w-4 h-4 text-gray-400" />
                                   </button>

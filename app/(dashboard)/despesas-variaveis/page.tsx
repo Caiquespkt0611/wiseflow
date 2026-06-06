@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2, Search, ChevronDown, ChevronRight as ChevronRightIcon, CreditCard } from "lucide-react";
-import { format, addMonths } from "date-fns";
+import { Plus, Pencil, Trash2, CheckCircle2, Search, ChevronDown, ChevronRight as ChevronRightIcon, CreditCard, RotateCcw } from "lucide-react";
+import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
@@ -115,6 +115,26 @@ export default function DespesasVariaveisPage() {
         confirmadaAte,
         ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
       }),
+    });
+    fetchData();
+  };
+
+  const handleReverterVariavel = async (item: DespesaVariavel) => {
+    const d = new Date(item.dataInicio);
+    const prevInicio = subMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
+    const wasLast = item.parcelaAtual > item.parcelasTotal;
+    const body: Record<string, unknown> = {
+      dataInicio: format(prevInicio, "yyyy-MM-dd"),
+      confirmadaAte: null,
+    };
+    if (wasLast) {
+      const oldDiffMeses = (ano - prevInicio.getFullYear()) * 12 + (mes - 1 - prevInicio.getMonth());
+      body.parcelaAtual = item.parcelasTotal - oldDiffMeses;
+    }
+    await fetch(`/api/despesas-variaveis/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
     fetchData();
   };
@@ -335,6 +355,13 @@ export default function DespesasVariaveisPage() {
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Pago</span>
+                                      <button
+                                        onClick={() => handleReverterVariavel(item)}
+                                        title="Desfazer pagamento"
+                                        className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                      >
+                                        <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
+                                      </button>
                                       <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                                         <Pencil className="w-4 h-4 text-gray-400" />
                                       </button>
