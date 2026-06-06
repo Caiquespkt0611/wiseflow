@@ -18,7 +18,7 @@ interface DashboardData {
   totalDespesas: number;
   totalFixas: number;
   totalVariaveis: number;
-  psi: number;
+  previsao: number;
   saldoBancario: number;
   isFuturo: boolean;
   categoriasFixas: CategoriaItem[];
@@ -99,16 +99,16 @@ export default function DashboardPage() {
               color="emerald"
             />
             <StatCard
-              title="Total Despesas"
+              title="Despesas Pendentes"
               value={data?.totalDespesas ?? 0}
               icon={<TrendingDown className="w-6 h-6" />}
               color="red"
             />
             <StatCard
-              title="PSI (Previsão)"
-              value={data?.psi ?? 0}
+              title="Previsão Fim do Mês"
+              value={data?.previsao ?? 0}
               icon={<Wallet className="w-6 h-6" />}
-              color={(data?.psi ?? 0) >= 0 ? "blue" : "orange"}
+              color={(data?.previsao ?? 0) >= 0 ? "blue" : "orange"}
             />
           </div>
 
@@ -138,14 +138,14 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
                 <Row label="Receitas Pendentes" value={data?.totalReceitas ?? 0} positive />
-                <Row label="Despesas Fixas" value={-(data?.totalFixas ?? 0)} />
-                <Row label="Despesas Variáveis" value={-(data?.totalVariaveis ?? 0)} />
+                <Row label="Despesas Fixas Pendentes" value={-(data?.totalFixas ?? 0)} />
+                <Row label="Despesas Variáveis Pendentes" value={-(data?.totalVariaveis ?? 0)} />
                 <div className="border-t pt-3">
                   <Row
-                    label="PSI (Previsão de Fechamento)"
-                    value={data?.psi ?? 0}
+                    label="Previsão Fim do Mês"
+                    value={data?.previsao ?? 0}
                     bold
-                    positive={(data?.psi ?? 0) >= 0}
+                    positive={(data?.previsao ?? 0) >= 0}
                   />
                 </div>
               </div>

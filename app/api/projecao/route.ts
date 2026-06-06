@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const saldoBancario = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
 
   const projecao = [];
-  let psiAcumulado = saldoBancario;
+  let previsaoAcumulada = saldoBancario;
 
   for (let i = 0; i < totalMeses; i++) {
     let mes = mesBase + i;
@@ -84,8 +84,8 @@ export async function GET(req: NextRequest) {
     }, 0);
 
     const totalDespesas = totalFixas + totalVariaveis;
-    const psiMes = totalReceitas - totalDespesas;
-    psiAcumulado += psiMes;
+    const previsaoMes = totalReceitas - totalDespesas;
+    previsaoAcumulada += previsaoMes;
 
     projecao.push({
       mes,
@@ -96,8 +96,8 @@ export async function GET(req: NextRequest) {
       totalDespesas,
       totalFixas,
       totalVariaveis,
-      psiMes,
-      psiAcumulado,
+      previsaoMes,
+      previsaoAcumulada,
     });
   }
 

@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function calcReceitas(
-  receitas: { valor: number; recorrente: boolean; parcelada: boolean; ativa: boolean; data: Date; mesesTotal?: number | null; excecoes?: string[] | null }[],
+  receitas: { valor: number; recorrente: boolean; parcelada: boolean; ativa: boolean; data: Date; mesesTotal?: number | null; excecoes?: string[] | null; confirmadaAte?: Date | null }[],
   inicio: Date,
   fim: Date,
   mes: number,
@@ -14,6 +14,7 @@ function calcReceitas(
   return receitas
     .filter((r) => {
       if (!r.ativa) return false;
+      if (r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return false;
       if (r.parcelada && r.mesesTotal) {
         const diffMeses = (ano - r.data.getUTCFullYear()) * 12 + (mes - 1 - r.data.getUTCMonth());
         return diffMeses >= 0 && diffMeses < r.mesesTotal;
@@ -30,41 +31,46 @@ function calcReceitas(
 
 function calcFixas(
   fixas: { valor: number; dataProximoVencimento: Date | null }[],
-  fim: Date
+  mes: number,
+  ano: number
 ) {
   return fixas
-    .filter((d) => !d.dataProximoVencimento || d.dataProximoVencimento <= fim)
+    .filter((d) => {
+      if (!d.dataProximoVencimento) return true;
+      const proxAno = d.dataProximoVencimento.getUTCFullYear();
+      const proxMes = d.dataProximoVencimento.getUTCMonth() + 1;
+      // Pending if next due is in this month or before (not yet paid for selected month)
+      return proxAno < ano || (proxAno === ano && proxMes <= mes);
+    })
     .reduce((sum, d) => sum + d.valor, 0);
 }
 
 function calcVariaveis(
-  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date }[],
+  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date; confirmadaAte?: Date | null }[],
   mes: number,
   ano: number
 ) {
   return variaveis.reduce((sum, d) => {
     const diffMeses =
-      (ano - d.dataInicio.getFullYear()) * 12 + (mes - 1 - d.dataInicio.getMonth());
+      (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal) {
-      return sum + d.valorParcela;
-    }
-    return sum;
+    if (parcelaAtualCalc < 1 || parcelaAtualCalc > d.parcelasTotal) return sum;
+    if (d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
+    return sum + d.valorParcela;
   }, 0);
 }
 
 function calcReceitasVar(
-  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date }[],
+  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date; confirmadaAte?: Date | null }[],
   mes: number,
   ano: number
 ) {
   return variaveis.reduce((sum, r) => {
     const diffMeses = (ano - r.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - r.dataInicio.getUTCMonth());
     const parcelaAtualCalc = r.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= r.parcelasTotal) {
-      return sum + r.valorParcela;
-    }
-    return sum;
+    if (parcelaAtualCalc < 1 || parcelaAtualCalc > r.parcelasTotal) return sum;
+    if (r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
+    return sum + r.valorParcela;
   }, 0);
 }
 
@@ -104,7 +110,7 @@ export async function GET(req: NextRequest) {
 
   const saldoBancarioReal = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
 
-  // Para meses futuros: acumula PSI desde o mês atual até o mês anterior ao solicitado
+  // Para meses futuros: acumula previsão desde o mês atual até o mês anterior ao solicitado
   let saldoEfetivo = saldoBancarioReal;
   if (isFuturo) {
     let m = mesAtual;
@@ -114,7 +120,7 @@ export async function GET(req: NextRequest) {
       const fim_m = new Date(a, m, 0, 23, 59, 59);
       const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a);
       const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
-      const f = calcFixas(todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), fim_m);
+      const f = calcFixas(todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), m, a);
       const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       saldoEfetivo += r + rv - f - v;
       m++;
@@ -128,24 +134,29 @@ export async function GET(req: NextRequest) {
   const receitasVarFixadas = todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
 
   const totalReceitas = calcReceitas(receitasFixadas, inicio, fim, mes, ano) + calcReceitasVar(receitasVarFixadas, mes, ano);
-  const totalFixas = calcFixas(fixasFixadas, fim);
+  const totalFixas = calcFixas(fixasFixadas, mes, ano);
   const totalVariaveis = calcVariaveis(variaveisFixadas, mes, ano);
   const totalDespesas = totalFixas + totalVariaveis;
-  const psi = saldoEfetivo + totalReceitas - totalDespesas;
+  const previsao = saldoEfetivo + totalReceitas - totalDespesas;
 
-  // Breakdown por categoria (para gráficos)
-  const fixasFiltradas = fixasFixadas.filter(
-    (d) => !d.dataProximoVencimento || d.dataProximoVencimento <= fim
-  );
+  // Breakdown por categoria (para gráficos) — pending only
+  const fixasFiltradas = fixasFixadas.filter((d) => {
+    if (!d.dataProximoVencimento) return true;
+    const proxAno = d.dataProximoVencimento.getUTCFullYear();
+    const proxMes = d.dataProximoVencimento.getUTCMonth() + 1;
+    return proxAno < ano || (proxAno === ano && proxMes <= mes);
+  });
   const categoriasFixas = groupByCategoria(
     fixasFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valor }))
   );
 
   const variaveisFiltradas = variaveisFixadas.filter((d) => {
     const diffMeses =
-      (ano - d.dataInicio.getFullYear()) * 12 + (mes - 1 - d.dataInicio.getMonth());
+      (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-    return parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal;
+    if (parcelaAtualCalc < 1 || parcelaAtualCalc > d.parcelasTotal) return false;
+    if (d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return false;
+    return true;
   });
   const categoriasVariaveis = groupByCategoria(
     variaveisFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valorParcela }))
@@ -160,7 +171,7 @@ export async function GET(req: NextRequest) {
     totalDespesas,
     totalFixas,
     totalVariaveis,
-    psi,
+    previsao,
     saldoBancario: saldoEfetivo,
     isFuturo,
     categoriasFixas,

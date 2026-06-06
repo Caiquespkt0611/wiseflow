@@ -28,11 +28,11 @@ interface ProjecaoMes {
   totalDespesas: number;
   totalFixas: number;
   totalVariaveis: number;
-  psiMes: number;
-  psiAcumulado: number;
+  previsaoMes: number;
+  previsaoAcumulada: number;
   // campos simulados
-  psiMesSim?: number;
-  psiAcumuladoSim?: number;
+  previsaoMesSim?: number;
+  previsaoAcumuladaSim?: number;
   totalDespesasSim?: number;
 }
 
@@ -80,20 +80,20 @@ export default function ProjecaoPage() {
 
   const aplicarSimulacao = (form: SimFormData) => {
     const parcela = form.valorTotal / form.parcelas;
-    let psiAcum = saldoBancario;
+    let acumSim = saldoBancario;
 
     const novo = base.map((row, i) => {
       const mesIdx = i + 1;
       const temParcela = mesIdx >= form.mesInicio && mesIdx < form.mesInicio + form.parcelas;
       const despesaExtra = temParcela ? parcela : 0;
       const totalDespesasSim = row.totalDespesas + despesaExtra;
-      const psiMesSim = row.totalReceitas - totalDespesasSim;
-      psiAcum += psiMesSim;
+      const previsaoMesSim = row.totalReceitas - totalDespesasSim;
+      acumSim += previsaoMesSim;
       return {
         ...row,
         totalDespesasSim,
-        psiMesSim,
-        psiAcumuladoSim: psiAcum,
+        previsaoMesSim,
+        previsaoAcumuladaSim: acumSim,
       };
     });
 
@@ -132,7 +132,7 @@ export default function ProjecaoPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Projeção 12 Meses</h1>
         <p className="text-sm text-gray-500 mt-1">
-          PSI acumulado partindo do saldo atual em contas ({formatCurrency(saldoBancario)})
+          Previsão acumulada partindo do saldo atual em contas ({formatCurrency(saldoBancario)})
         </p>
       </div>
 
@@ -240,11 +240,11 @@ export default function ProjecaoPage() {
               { label: "Receita Média", value: data.reduce((s, d) => s + d.totalReceitas, 0) / 12, color: "text-emerald-600" },
               { label: "Despesa Média", value: data.reduce((s, d) => s + d.totalDespesas, 0) / 12, color: "text-red-600" },
               {
-                label: simAtiva ? "PSI Acumulado (sim)" : "PSI Acumulado 12m",
+                label: simAtiva ? "Prev. Acumulada (sim)" : "Prev. Acumulada 12m",
                 value: simAtiva
-                  ? (data[data.length - 1]?.psiAcumuladoSim ?? 0)
-                  : (data[data.length - 1]?.psiAcumulado ?? 0),
-                color: ((simAtiva ? data[data.length - 1]?.psiAcumuladoSim : data[data.length - 1]?.psiAcumulado) ?? 0) >= 0
+                  ? (data[data.length - 1]?.previsaoAcumuladaSim ?? 0)
+                  : (data[data.length - 1]?.previsaoAcumulada ?? 0),
+                color: ((simAtiva ? data[data.length - 1]?.previsaoAcumuladaSim : data[data.length - 1]?.previsaoAcumulada) ?? 0) >= 0
                   ? "text-emerald-600" : "text-red-600",
               },
             ].map((item) => (
@@ -281,10 +281,10 @@ export default function ProjecaoPage() {
             </div>
           </div>
 
-          {/* PSI acumulado */}
+          {/* Previsão Acumulada */}
           <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 overflow-hidden">
             <h2 className="text-base font-semibold text-gray-800 mb-1">
-              PSI Acumulado
+              Previsão Acumulada
             </h2>
             <p className="text-xs text-gray-400 mb-4">Parte de {formatCurrency(saldoBancario)} (saldo atual em contas)</p>
             <div className="w-full min-w-0 overflow-hidden">
@@ -295,12 +295,12 @@ export default function ProjecaoPage() {
                   <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 10 }} width={55} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line type="monotone" dataKey="psiMes" name="PSI Mensal" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="psiAcumulado" name="PSI Acumulado" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="previsaoMes" name="Previsão Mensal" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="previsaoAcumulada" name="Previsão Acumulada" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                   {simAtiva && (
                     <>
-                      <Line type="monotone" dataKey="psiMesSim" name="PSI Mensal (sim)" stroke="#a855f7" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="psiAcumuladoSim" name="PSI Acumulado (sim)" stroke="#7c3aed" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="previsaoMesSim" name="Previsão Mensal (sim)" stroke="#a855f7" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="previsaoAcumuladaSim" name="Previsão Acumulada (sim)" stroke="#7c3aed" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 3 }} />
                     </>
                   )}
                 </LineChart>
@@ -314,7 +314,7 @@ export default function ProjecaoPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["Mês", "Em Caixa", "Receitas", "Fixas", "Variáveis", "PSI Acumulado", "Simulação"].map((h) => (
+                    {["Mês", "Em Caixa", "Receitas", "Fixas", "Variáveis", "Previsão Acumulada", "Simulação"].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -326,8 +326,8 @@ export default function ProjecaoPage() {
                     const emCaixa = row.isAtual
                       ? saldoBancario
                       : simAtiva
-                        ? (data[i - 1]?.psiAcumuladoSim ?? saldoBancario)
-                        : (data[i - 1]?.psiAcumulado ?? saldoBancario);
+                        ? (data[i - 1]?.previsaoAcumuladaSim ?? saldoBancario)
+                        : (data[i - 1]?.previsaoAcumulada ?? saldoBancario);
                     return (
                       <tr key={row.label} className={`hover:bg-gray-50 ${row.isAtual ? "bg-emerald-50/40" : ""}`}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.label}</td>
@@ -350,13 +350,13 @@ export default function ProjecaoPage() {
                         <td className="px-4 py-3 text-sm text-emerald-600 font-medium">{formatCurrency(row.totalReceitas)}</td>
                         <td className="px-4 py-3 text-sm text-red-500">{formatCurrency(row.totalFixas)}</td>
                         <td className="px-4 py-3 text-sm text-orange-500">{formatCurrency(row.totalVariaveis)}</td>
-                        <td className={`px-4 py-3 text-sm font-bold ${row.psiAcumulado >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                          {formatCurrency(row.psiAcumulado)}
+                        <td className={`px-4 py-3 text-sm font-bold ${row.previsaoAcumulada >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          {formatCurrency(row.previsaoAcumulada)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {simAtiva && row.psiAcumuladoSim !== undefined ? (
-                            <span className={`font-bold ${row.psiAcumuladoSim >= 0 ? "text-violet-700" : "text-red-600"}`}>
-                              {formatCurrency(row.psiAcumuladoSim)}
+                          {simAtiva && row.previsaoAcumuladaSim !== undefined ? (
+                            <span className={`font-bold ${row.previsaoAcumuladaSim >= 0 ? "text-violet-700" : "text-red-600"}`}>
+                              {formatCurrency(row.previsaoAcumuladaSim)}
                             </span>
                           ) : (
                             <span className="text-gray-300">—</span>
