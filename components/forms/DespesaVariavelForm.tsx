@@ -54,7 +54,17 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Cartão" error={errors.cartao?.message}>
-          <input {...register("cartao")} className={inputClass} placeholder="Ex: Nubank, Inter..." />
+          <input {...register("cartao")} list="cartoes-sugestoes" className={inputClass} placeholder="Ex: Nubank, Inter..." />
+          <datalist id="cartoes-sugestoes">
+            <option value="Bradesco" />
+            <option value="C6 Bank" />
+            <option value="Cartão Emprestado" />
+            <option value="Inter" />
+            <option value="Itaú" />
+            <option value="Nubank" />
+            <option value="Santander" />
+            <option value="XP" />
+          </datalist>
         </Field>
         <Field label="Categoria" error={errors.categoria?.message}>
           <select {...register("categoria")} className={inputClass}>

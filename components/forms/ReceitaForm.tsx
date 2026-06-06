@@ -39,7 +39,7 @@ interface Props {
   loading?: boolean;
 }
 
-const tipoOptions = ["Salário", "Freelance", "Aluguel", "Investimento", "Outro"];
+const tipoOptions = ["Aluguel", "Freelance", "Investimento", "Outro", "Receitas de Terceiros", "Salário"];
 
 export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
   const {
