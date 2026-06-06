@@ -3,6 +3,7 @@
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { AlertTriangle } from "lucide-react";
 
 const schema = z.object({
   descricao: z.string().min(1, "Obrigatório"),
@@ -39,7 +40,7 @@ interface Props {
   loading?: boolean;
 }
 
-const tipoOptions = ["Aluguel", "Freelance", "Investimento", "Outro", "Receitas de Terceiros", "Salário"];
+const tipoOptions = ["Adiantamento", "Aluguel", "Férias", "Freelance", "Investimento", "Outro", "Receitas de Terceiros", "Salário"];
 
 export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
   const {
@@ -53,6 +54,7 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
   });
 
   const recorrencia = watch("recorrencia");
+  const tipo = watch("tipo");
 
   const handleFormSubmit = (data: ReceitaFormData) => {
     const payload: ReceitaPayload = {
@@ -106,6 +108,13 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
           ))}
         </div>
       </Field>
+
+      {tipo === "Férias" && (
+        <div className="flex gap-2 items-start bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+          <p>Ao salvar, o sistema pedirá confirmação e aplicará automaticamente as exceções nos meses de <strong>Salário</strong> e <strong>Adiantamento</strong> afetados pelas férias.</p>
+        </div>
+      )}
 
       {recorrencia === "parcelada" && (
         <Field label="Quantidade de meses" error={errors.mesesTotal?.message}>

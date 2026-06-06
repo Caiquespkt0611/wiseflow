@@ -323,7 +323,11 @@ export default function ProjecaoPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {data.map((row, i) => {
-                    const emCaixa = row.isAtual ? saldoBancario : (data[i - 1]?.psiAcumulado ?? saldoBancario);
+                    const emCaixa = row.isAtual
+                      ? saldoBancario
+                      : simAtiva
+                        ? (data[i - 1]?.psiAcumuladoSim ?? saldoBancario)
+                        : (data[i - 1]?.psiAcumulado ?? saldoBancario);
                     return (
                       <tr key={row.label} className={`hover:bg-gray-50 ${row.isAtual ? "bg-emerald-50/40" : ""}`}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.label}</td>
@@ -332,8 +336,14 @@ export default function ProjecaoPage() {
                             <span className={`text-sm font-bold ${emCaixa >= 0 ? "text-teal-600" : "text-red-600"}`}>
                               {formatCurrency(emCaixa)}
                             </span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full w-fit ${row.isAtual ? "bg-emerald-100 text-emerald-700 font-semibold" : "bg-blue-50 text-blue-500"}`}>
-                              {row.isAtual ? "Atual" : "Projetado"}
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full w-fit ${
+                              row.isAtual
+                                ? "bg-emerald-100 text-emerald-700 font-semibold"
+                                : simAtiva
+                                  ? "bg-violet-100 text-violet-700"
+                                  : "bg-blue-50 text-blue-500"
+                            }`}>
+                              {row.isAtual ? "Atual" : simAtiva ? "Projetado Simulado" : "Projetado"}
                             </span>
                           </div>
                         </td>

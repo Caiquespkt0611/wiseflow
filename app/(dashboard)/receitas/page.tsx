@@ -67,6 +67,7 @@ export default function ReceitasPage() {
   const [skipMes, setSkipMes] = useState("");
   const [filtro, setFiltro] = useState("");
   const [sort, setSort] = useState<SortState>(null);
+  const [feriasConfirm, setFeriasConfirm] = useState<ReceitaPayload | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -78,6 +79,11 @@ export default function ReceitasPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreate = async (data: ReceitaPayload) => {
+    if (data.tipo === "Férias") {
+      setFeriasConfirm(data);
+      setModal(null);
+      return;
+    }
     setSaving(true);
     const res = await fetch("/api/receitas", {
       method: "POST",
@@ -86,6 +92,48 @@ export default function ReceitasPage() {
     });
     setSaving(false);
     if (res.ok) { setModal(null); fetchData(); }
+  };
+
+  const handleFeriasConfirm = async () => {
+    if (!feriasConfirm) return;
+    setSaving(true);
+
+    const res = await fetch("/api/receitas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(feriasConfirm),
+    });
+
+    if (res.ok) {
+      const feriasDate = new Date(feriasConfirm.data);
+      const feriasDay = feriasDate.getUTCDate();
+      const feriasYear = feriasDate.getUTCFullYear();
+      const feriasMonthIdx = feriasDate.getUTCMonth();
+
+      const feriasMesKey = `${feriasYear}-${String(feriasMonthIdx + 1).padStart(2, "0")}`;
+      const nextDate = new Date(Date.UTC(feriasYear, feriasMonthIdx + 1, 1));
+      const nextMesKey = `${nextDate.getUTCFullYear()}-${String(nextDate.getUTCMonth() + 1).padStart(2, "0")}`;
+
+      const salarios = items.filter(
+        (i) => i.recorrente && i.ativa && (i.tipo === "Salário" || i.tipo === "Adiantamento")
+      );
+
+      for (const salario of salarios) {
+        const salarioDay = new Date(salario.data).getUTCDate();
+        const exceptionKey = salarioDay < feriasDay ? nextMesKey : feriasMesKey;
+        if (!(salario.excecoes ?? []).includes(exceptionKey)) {
+          await fetch(`/api/receitas/${salario.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ excecoes: [...(salario.excecoes ?? []), exceptionKey] }),
+          });
+        }
+      }
+
+      setFeriasConfirm(null);
+      fetchData();
+    }
+    setSaving(false);
   };
 
   const handleEdit = async (data: ReceitaPayload) => {
@@ -170,7 +218,7 @@ export default function ReceitasPage() {
         descricao: selected.descricao,
         tipo: selected.tipo,
         valor: selected.valor,
-        data: format(new Date(selected.data), "yyyy-MM-dd"),
+        data: selected.data.slice(0, 10),
         responsavel: selected.responsavel,
         recorrencia: getRecorrencia(selected),
         mesesTotal: selected.mesesTotal ?? undefined,
@@ -218,13 +266,13 @@ export default function ReceitasPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Receitas</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Receitas Fixas</h1>
         <button
           onClick={() => setModal("create")}
           className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Nova Receita
+          Nova Receita Fixa
         </button>
       </div>
 
@@ -368,13 +416,44 @@ export default function ReceitasPage() {
       </div>
 
       {modal === "create" && (
-        <Modal title="Nova Receita" onClose={() => setModal(null)}>
+        <Modal title="Nova Receita Fixa" onClose={() => setModal(null)}>
           <ReceitaForm onSubmit={handleCreate} loading={saving} />
         </Modal>
       )}
       {modal === "edit" && selected && (
         <Modal title="Editar Receita" onClose={() => { setModal(null); setSelected(null); }}>
           <ReceitaForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} />
+        </Modal>
+      )}
+
+      {feriasConfirm && (
+        <Modal title="Confirmar registro de Férias" onClose={() => setFeriasConfirm(null)}>
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+              <p className="font-semibold mb-2">Atenção: impacto nas receitas recorrentes</p>
+              <p>Ao confirmar, o sistema irá registrar as férias e <strong>aplicar automaticamente exceções</strong> nos meses de Salário e Adiantamento afetados, de acordo com a data de início informada:</p>
+              <ul className="mt-2 space-y-1 list-disc pl-4">
+                <li>Receitas com dia de recebimento <strong>anterior</strong> ao início das férias: a parcela do mês seguinte será desconsiderada.</li>
+                <li>Receitas com dia de recebimento <strong>igual ou posterior</strong> ao início das férias: a parcela do próprio mês será desconsiderada.</li>
+              </ul>
+              <p className="mt-2 text-xs text-amber-600">Você pode desfazer qualquer exceção manualmente na lista de receitas.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFeriasConfirm(null)}
+                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleFeriasConfirm}
+                disabled={saving}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+              >
+                {saving ? "Aplicando..." : "Confirmar e registrar férias"}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 

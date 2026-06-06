@@ -94,7 +94,7 @@ export default function ReceitasVariaveisPage() {
         valorParcela: selected.valorParcela,
         parcelasTotal: Math.max(selected.parcelasTotal - (selected.parcelaAtual - 1), 1),
         responsavel: selected.responsavel,
-        dataInicio: format(new Date(selected.dataInicio), "yyyy-MM-dd"),
+        dataInicio: selected.dataInicio.slice(0, 10),
       }
     : undefined;
 

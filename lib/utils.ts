@@ -13,7 +13,10 @@ export function formatCurrency(value: number): string {
 }
 
 export function formatDate(date: Date | string): string {
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
+  const d = new Date(date);
+  return new Intl.DateTimeFormat("pt-BR").format(
+    new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
 }
 
 export function getMonthYear(date: Date): { month: number; year: number } {

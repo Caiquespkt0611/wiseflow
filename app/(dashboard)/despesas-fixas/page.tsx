@@ -93,7 +93,7 @@ export default function DespesasFixasPage() {
   };
 
   const defaultEditValues = selected
-    ? { ...selected, dataInicio: format(new Date(selected.dataInicio), "yyyy-MM-dd") }
+    ? { ...selected, dataInicio: selected.dataInicio.slice(0, 10) }
     : undefined;
 
   const now = new Date();

@@ -4,14 +4,25 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function calcReceitas(
-  receitas: { valor: number; recorrente: boolean; ativa: boolean; data: Date }[],
+  receitas: { valor: number; recorrente: boolean; parcelada: boolean; ativa: boolean; data: Date; mesesTotal?: number | null; excecoes?: string[] | null }[],
   inicio: Date,
-  fim: Date
+  fim: Date,
+  mes: number,
+  ano: number
 ) {
+  const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
   return receitas
     .filter((r) => {
       if (!r.ativa) return false;
-      if (r.recorrente) return r.data <= fim;
+      if (r.parcelada && r.mesesTotal) {
+        const diffMeses = (ano - r.data.getUTCFullYear()) * 12 + (mes - 1 - r.data.getUTCMonth());
+        return diffMeses >= 0 && diffMeses < r.mesesTotal;
+      }
+      if (r.recorrente) {
+        if (r.data > fim) return false;
+        if ((r.excecoes ?? []).includes(mesKey)) return false;
+        return true;
+      }
       return r.data >= inicio && r.data <= fim;
     })
     .reduce((sum, r) => sum + r.valor, 0);
@@ -85,7 +96,7 @@ export async function GET(req: NextRequest) {
     while (a * 12 + m < ano * 12 + mes) {
       const ini = new Date(a, m - 1, 1);
       const fim_m = new Date(a, m, 0, 23, 59, 59);
-      const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m);
+      const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a);
       const f = calcFixas(todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), fim_m);
       const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       saldoEfetivo += r - f - v;
@@ -98,7 +109,7 @@ export async function GET(req: NextRequest) {
   const fixasFixadas = todasFixas.map(x => ({ ...x, dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null }));
   const variaveisFixadas = todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) }));
 
-  const totalReceitas = calcReceitas(receitasFixadas, inicio, fim);
+  const totalReceitas = calcReceitas(receitasFixadas, inicio, fim, mes, ano);
   const totalFixas = calcFixas(fixasFixadas, fim);
   const totalVariaveis = calcVariaveis(variaveisFixadas, mes, ano);
   const totalDespesas = totalFixas + totalVariaveis;
