@@ -33,7 +33,6 @@ export default function DespesasFixasPage() {
 
   const mes = date.getMonth() + 1;
   const ano = date.getFullYear();
-  const fim = new Date(ano, mes, 0, 23, 59, 59);
   const now = new Date();
   const isCurrentMonth = now.getMonth() + 1 === mes && now.getFullYear() === ano;
   const mesLabel = format(date, "MMM/yy", { locale: ptBR });
