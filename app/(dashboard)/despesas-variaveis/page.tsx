@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { Modal } from "@/components/ui/Modal";
-import { DespesaVariavelForm, DespesaVariavelFormData } from "@/components/forms/DespesaVariavelForm";
+import { DespesaVariavelForm, DespesaVariavelPayload } from "@/components/forms/DespesaVariavelForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface DespesaVariavel {
@@ -16,6 +16,7 @@ interface DespesaVariavel {
   parcelasTotal: number;
   valorParcela: number;
   responsavel: string;
+  categoria: string;
   dataInicio: string;
 }
 
@@ -35,7 +36,7 @@ export default function DespesasVariaveisPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCreate = async (data: DespesaVariavelFormData) => {
+  const handleCreate = async (data: DespesaVariavelPayload) => {
     setSaving(true);
     const res = await fetch("/api/despesas-variaveis", {
       method: "POST",
@@ -46,7 +47,7 @@ export default function DespesasVariaveisPage() {
     if (res.ok) { setModal(null); fetchData(); }
   };
 
-  const handleEdit = async (data: DespesaVariavelFormData) => {
+  const handleEdit = async (data: DespesaVariavelPayload) => {
     if (!selected) return;
     setSaving(true);
     const res = await fetch(`/api/despesas-variaveis/${selected.id}`, {
@@ -81,7 +82,16 @@ export default function DespesasVariaveisPage() {
   };
 
   const defaultEditValues = selected
-    ? { ...selected, dataInicio: format(new Date(selected.dataInicio), "yyyy-MM-dd") }
+    ? {
+        descricao: selected.descricao,
+        cartao: selected.cartao,
+        categoria: selected.categoria ?? "Outros",
+        valorParcela: selected.valorParcela,
+        // parcelas restantes a partir de hoje
+        parcelasTotal: Math.max(selected.parcelasTotal - (selected.parcelaAtual - 1), 1),
+        responsavel: selected.responsavel,
+        dataInicio: format(new Date(selected.dataInicio), "yyyy-MM-dd"),
+      }
     : undefined;
 
   const now = new Date();
@@ -96,10 +106,13 @@ export default function DespesasVariaveisPage() {
   const concluidas = items.filter((item) => getParcelaAtual(item) > item.parcelasTotal);
   const totalMensal = ativas.reduce((sum, i) => sum + i.valorParcela, 0);
 
-  // Parcela deste mês paga = dataInicio avançou além do mês atual
+  // Parcela deste mês paga = vencimento já foi avançado para um mês futuro
   const isConfirmada = (item: DespesaVariavel) => {
-    const inicio = new Date(item.dataInicio);
-    return inicio > new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const venc = new Date(item.dataInicio);
+    return (
+      venc.getFullYear() > now.getFullYear() ||
+      (venc.getFullYear() === now.getFullYear() && venc.getMonth() > now.getMonth())
+    );
   };
 
   const pendentes = ativas.filter((i) => !isConfirmada(i));
@@ -135,7 +148,7 @@ export default function DespesasVariaveisPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {["Descrição", "Cartão", "Responsável", "Parcelas", "Valor Parcela", "Valor Total", "Início", ""].map((h) => (
+                  {["Descrição", "Cartão", "Responsável", "Parcelas", "Valor Parcela", "Próximo Vencimento", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
                       {h}
                     </th>
@@ -161,7 +174,6 @@ export default function DespesasVariaveisPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-orange-600">{formatCurrency(item.valorParcela)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(item.valorTotal)}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
@@ -183,7 +195,7 @@ export default function DespesasVariaveisPage() {
                 {pagas.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={8} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
+                      <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
                         Parcelas pagas este mês
                       </td>
                     </tr>
@@ -198,7 +210,6 @@ export default function DespesasVariaveisPage() {
                             <span className="text-sm font-medium text-gray-500">{parcelaAtualCalc}/{item.parcelasTotal}</span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorParcela)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorTotal)}</td>
                           <td className="px-4 py-3 text-sm text-gray-400">{formatDate(item.dataInicio)}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
@@ -219,7 +230,7 @@ export default function DespesasVariaveisPage() {
                 {concluidas.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={8} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
+                      <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
                         Concluídas
                       </td>
                     </tr>
@@ -230,7 +241,6 @@ export default function DespesasVariaveisPage() {
                         <td className="px-4 py-3 text-sm text-gray-500">{item.responsavel}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{item.parcelasTotal}/{item.parcelasTotal}</td>
                         <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorParcela)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorTotal)}</td>
                         <td className="px-4 py-3 text-sm text-gray-400">{formatDate(item.dataInicio)}</td>
                         <td className="px-4 py-3">
                           <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">

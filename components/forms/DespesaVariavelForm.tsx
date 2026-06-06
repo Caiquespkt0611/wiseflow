@@ -9,8 +9,6 @@ const schema = z.object({
   descricao: z.string().min(1, "Obrigatório"),
   cartao: z.string().min(1, "Obrigatório"),
   categoria: z.string().min(1, "Obrigatório"),
-  valorTotal: z.coerce.number().positive("Obrigatório"),
-  parcelaAtual: z.coerce.number().int().min(1, "Obrigatório"),
   parcelasTotal: z.coerce.number().int().min(1, "Obrigatório"),
   valorParcela: z.coerce.number().positive("Obrigatório"),
   responsavel: z.string().min(1, "Obrigatório"),
@@ -19,9 +17,14 @@ const schema = z.object({
 
 export type DespesaVariavelFormData = z.infer<typeof schema>;
 
+export type DespesaVariavelPayload = DespesaVariavelFormData & {
+  parcelaAtual: number;
+  valorTotal: number;
+};
+
 interface Props {
   defaultValues?: Partial<DespesaVariavelFormData>;
-  onSubmit: (data: DespesaVariavelFormData) => Promise<void>;
+  onSubmit: (data: DespesaVariavelPayload) => Promise<void>;
   loading?: boolean;
 }
 
@@ -29,25 +32,22 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors },
   } = useForm<DespesaVariavelFormData>({
     resolver: zodResolver(schema) as Resolver<DespesaVariavelFormData>,
-    defaultValues: { parcelaAtual: 1, categoria: "Outros", ...defaultValues },
+    defaultValues: { categoria: "Outros", ...defaultValues },
   });
 
-  const valorTotal = watch("valorTotal");
-  const parcelasTotal = watch("parcelasTotal");
-
-  const calcParcela = () => {
-    if (valorTotal && parcelasTotal) {
-      setValue("valorParcela", Number((valorTotal / parcelasTotal).toFixed(2)));
-    }
+  const handleFormSubmit = (data: DespesaVariavelFormData) => {
+    return onSubmit({
+      ...data,
+      parcelaAtual: 1,
+      valorTotal: data.valorParcela * data.parcelasTotal,
+    });
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Field label="Descrição" error={errors.descricao?.message}>
         <input {...register("descricao")} className={inputClass} placeholder="Ex: iPhone 16" />
       </Field>
@@ -66,36 +66,22 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Valor Total (R$)" error={errors.valorTotal?.message}>
-          <input
-            {...register("valorTotal")}
-            type="number"
-            step="0.01"
-            className={inputClass}
-            placeholder="0,00"
-            onBlur={calcParcela}
-          />
-        </Field>
-        <Field label="Valor Parcela (R$)" error={errors.valorParcela?.message}>
+        <Field label="Valor da parcela (R$)" error={errors.valorParcela?.message}>
           <input {...register("valorParcela")} type="number" step="0.01" className={inputClass} placeholder="0,00" />
         </Field>
+        <Field label="Parcelas restantes" error={errors.parcelasTotal?.message}>
+          <input {...register("parcelasTotal")} type="number" min="1" className={inputClass} placeholder="Ex: 10" />
+        </Field>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Field label="Parcela Atual" error={errors.parcelaAtual?.message}>
-          <input {...register("parcelaAtual")} type="number" min="1" className={inputClass} />
-        </Field>
-        <Field label="Total Parcelas" error={errors.parcelasTotal?.message}>
-          <input {...register("parcelasTotal")} type="number" min="1" className={inputClass} onBlur={calcParcela} />
-        </Field>
-        <Field label="Data Início" error={errors.dataInicio?.message}>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Próximo vencimento" error={errors.dataInicio?.message}>
           <input {...register("dataInicio")} type="date" className={inputClass} />
         </Field>
+        <Field label="Responsável" error={errors.responsavel?.message}>
+          <input {...register("responsavel")} className={inputClass} placeholder="Nome do responsável" />
+        </Field>
       </div>
-
-      <Field label="Responsável" error={errors.responsavel?.message}>
-        <input {...register("responsavel")} className={inputClass} placeholder="Nome do responsável" />
-      </Field>
 
       <button
         type="submit"
