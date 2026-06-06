@@ -14,6 +14,7 @@ const schema = z.object({
   valorParcela: z.number().positive().optional(),
   responsavel: z.string().min(1).optional(),
   dataInicio: z.string().optional(),
+  confirmadaAte: z.string().nullable().optional(),
 });
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -30,7 +31,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const data = schema.parse(body);
     const updated = await prisma.despesaVariavel.update({
       where: { id: params.id },
-      data: { ...data, ...(data.dataInicio && { dataInicio: new Date(data.dataInicio) }) },
+      data: {
+        ...data,
+        ...(data.dataInicio && { dataInicio: new Date(data.dataInicio) }),
+        ...(data.confirmadaAte !== undefined && {
+          confirmadaAte: data.confirmadaAte ? new Date(data.confirmadaAte) : null,
+        }),
+      },
     });
     return NextResponse.json(updated);
   } catch (error) {

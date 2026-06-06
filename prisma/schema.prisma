@@ -76,20 +76,21 @@ model DespesaFixa {
 }
 
 model DespesaVariavel {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   descricao     String
   cartao        String
-  categoria     String   @default("Outros")
+  categoria     String    @default("Outros")
   valorTotal    Float
   parcelaAtual  Int
   parcelasTotal Int
   valorParcela  Float
   responsavel   String
   dataInicio    DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  confirmadaAte DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([userId])
   @@map("despesas_variaveis")

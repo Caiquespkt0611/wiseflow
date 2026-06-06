@@ -18,6 +18,7 @@ interface DespesaVariavel {
   responsavel: string;
   categoria: string;
   dataInicio: string;
+  confirmadaAte: string | null;
 }
 
 export default function DespesasVariaveisPage() {
@@ -67,12 +68,12 @@ export default function DespesasVariaveisPage() {
   };
 
   const handleConfirmar = async (item: DespesaVariavel) => {
-    // Avança dataInicio 1 mês → a parcela deste mês some, as próximas continuam
     const novaData = format(addMonths(new Date(item.dataInicio), 1), "yyyy-MM-dd");
+    const confirmadaAte = format(new Date(), "yyyy-MM-dd");
     await fetch(`/api/despesas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataInicio: novaData }),
+      body: JSON.stringify({ dataInicio: novaData, confirmadaAte }),
     });
     fetchData();
   };
@@ -116,13 +117,11 @@ export default function DespesasVariaveisPage() {
   const concluidas = itensFiltrados.filter((item) => getParcelaAtual(item) > item.parcelasTotal);
   const totalMensal = ativas.reduce((sum, i) => sum + i.valorParcela, 0);
 
-  // Parcela deste mês paga = vencimento já foi avançado para um mês futuro
+  // Paga este mês = confirmação explícita ocorreu neste mês/ano
   const isConfirmada = (item: DespesaVariavel) => {
-    const venc = new Date(item.dataInicio);
-    return (
-      venc.getFullYear() > now.getFullYear() ||
-      (venc.getFullYear() === now.getFullYear() && venc.getMonth() > now.getMonth())
-    );
+    if (!item.confirmadaAte) return false;
+    const c = new Date(item.confirmadaAte);
+    return c.getFullYear() === now.getFullYear() && c.getMonth() === now.getMonth();
   };
 
   const pendentes = ativas.filter((i) => !isConfirmada(i));
@@ -180,7 +179,7 @@ export default function DespesasVariaveisPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pendentes.map((item) => {
-                  const parcelaAtualCalc = Math.min(getParcelaAtual(item), item.parcelasTotal);
+                  const parcelaAtualCalc = Math.max(1, Math.min(getParcelaAtual(item), item.parcelasTotal));
                   return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
@@ -223,7 +222,7 @@ export default function DespesasVariaveisPage() {
                       </td>
                     </tr>
                     {pagas.map((item) => {
-                      const parcelaAtualCalc = Math.min(getParcelaAtual(item), item.parcelasTotal);
+                      const parcelaAtualCalc = Math.max(1, Math.min(getParcelaAtual(item), item.parcelasTotal));
                       return (
                         <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
                           <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
