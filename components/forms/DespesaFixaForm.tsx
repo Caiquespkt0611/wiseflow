@@ -53,11 +53,10 @@ export function DespesaFixaForm({ defaultValues, onSubmit, loading }: Props) {
           <input {...register("responsavel")} className={inputClass} placeholder="Nome do responsável" />
         </Field>
         <Field label="Categoria" error={errors.categoria?.message}>
-          <select {...register("categoria")} className={inputClass}>
-            {CATEGORIAS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          <input {...register("categoria")} list="categorias-despesa-fixa" className={inputClass} placeholder="Selecione ou digite..." />
+          <datalist id="categorias-despesa-fixa">
+            {CATEGORIAS.map((c) => <option key={c} value={c} />)}
+          </datalist>
         </Field>
       </div>
 

@@ -65,11 +65,10 @@ export function ReceitaVariavelForm({ defaultValues, onSubmit, loading }: Props)
           </datalist>
         </Field>
         <Field label="Categoria" error={errors.categoria?.message}>
-          <select {...register("categoria")} className={inputClass}>
-            {CATEGORIAS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          <input {...register("categoria")} list="categorias-receita-var" className={inputClass} placeholder="Selecione ou digite..." />
+          <datalist id="categorias-receita-var">
+            {CATEGORIAS.map((c) => <option key={c} value={c} />)}
+          </datalist>
         </Field>
       </div>
 

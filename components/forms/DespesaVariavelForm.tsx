@@ -67,11 +67,10 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
           </datalist>
         </Field>
         <Field label="Categoria" error={errors.categoria?.message}>
-          <select {...register("categoria")} className={inputClass}>
-            {CATEGORIAS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          <input {...register("categoria")} list="categorias-despesa-var" className={inputClass} placeholder="Selecione ou digite..." />
+          <datalist id="categorias-despesa-var">
+            {CATEGORIAS.map((c) => <option key={c} value={c} />)}
+          </datalist>
         </Field>
       </div>
 

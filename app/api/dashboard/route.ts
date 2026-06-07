@@ -8,13 +8,14 @@ function calcReceitas(
   inicio: Date,
   fim: Date,
   mes: number,
-  ano: number
+  ano: number,
+  excluirConfirmadas = true
 ) {
   const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
   return receitas
     .filter((r) => {
       if (!r.ativa) return false;
-      if (r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return false;
+      if (excluirConfirmadas && r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return false;
       if (r.parcelada && r.mesesTotal) {
         const diffMeses = (ano - r.data.getUTCFullYear()) * 12 + (mes - 1 - r.data.getUTCMonth());
         return diffMeses >= 0 && diffMeses < r.mesesTotal;
@@ -52,14 +53,15 @@ function calcFixas(
 function calcVariaveis(
   variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date; confirmadaAte?: Date | null }[],
   mes: number,
-  ano: number
+  ano: number,
+  excluirConfirmadas = true
 ) {
   return variaveis.reduce((sum, d) => {
     const diffMeses =
       (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
     if (parcelaAtualCalc < 1 || parcelaAtualCalc > d.parcelasTotal) return sum;
-    if (d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
+    if (excluirConfirmadas && d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
     return sum + d.valorParcela;
   }, 0);
 }
@@ -67,13 +69,14 @@ function calcVariaveis(
 function calcReceitasVar(
   variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date; confirmadaAte?: Date | null }[],
   mes: number,
-  ano: number
+  ano: number,
+  excluirConfirmadas = true
 ) {
   return variaveis.reduce((sum, r) => {
     const diffMeses = (ano - r.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - r.dataInicio.getUTCMonth());
     const parcelaAtualCalc = r.parcelaAtual + diffMeses;
     if (parcelaAtualCalc < 1 || parcelaAtualCalc > r.parcelasTotal) return sum;
-    if (r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
+    if (excluirConfirmadas && r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
     return sum + r.valorParcela;
   }, 0);
 }
@@ -122,10 +125,10 @@ export async function GET(req: NextRequest) {
     while (a * 12 + m < ano * 12 + mes) {
       const ini = new Date(a, m - 1, 1);
       const fim_m = new Date(a, m, 0, 23, 59, 59);
-      const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a);
-      const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
+      const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a, false);
+      const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a, false);
       const f = calcFixas(todasFixas.map(x => ({ ...x, dataInicio: new Date(x.dataInicio), dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), m, a);
-      const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
+      const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a, false);
       saldoEfetivo += r + rv - f - v;
       m++;
       if (m > 12) { m = 1; a++; }

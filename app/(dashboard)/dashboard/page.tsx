@@ -213,16 +213,16 @@ function DonutCard({ title, data, total }: { title: string; data: CategoriaItem[
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <h3 className="font-semibold text-gray-700 mb-4">{title}</h3>
-      <div className="flex flex-col sm:flex-row items-center gap-4">
-        <div className="relative w-48 h-48 flex-shrink-0">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative w-36 h-36 flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={52}
-                outerRadius={80}
+                innerRadius={42}
+                outerRadius={66}
                 paddingAngle={2}
                 dataKey="valor"
                 startAngle={90}
@@ -237,21 +237,21 @@ function DonutCard({ title, data, total }: { title: string; data: CategoriaItem[
           </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-xs text-gray-400">Total</span>
-            <span className="text-sm font-bold text-gray-800">{formatCurrency(total)}</span>
+            <span className="text-xs font-bold text-gray-800">{formatCurrency(total)}</span>
           </div>
         </div>
-        <div className="flex-1 space-y-2 w-full">
+        <div className="w-full space-y-1.5">
           {chartData.map((item, i) => (
-            <div key={item.categoria} className="flex items-center gap-2">
+            <div key={item.categoria} className="flex items-center gap-2 min-w-0">
               <div
                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: item.fill }}
               />
-              <span className="text-xs text-gray-600 flex-1 truncate">{item.categoria}</span>
-              <span className="text-xs font-semibold" style={{ color: CATEGORIA_COLORS_BY_RANK[i] ?? "#71717a" }}>
+              <span className="text-xs text-gray-600 flex-1 min-w-0 truncate">{item.categoria}</span>
+              <span className="text-xs font-semibold flex-shrink-0" style={{ color: CATEGORIA_COLORS_BY_RANK[i] ?? "#71717a" }}>
                 {item.pct}%
               </span>
-              <span className="text-xs text-gray-500 w-20 text-right">{formatCurrency(item.valor)}</span>
+              <span className="text-xs text-gray-500 flex-shrink-0 w-20 text-right">{formatCurrency(item.valor)}</span>
             </div>
           ))}
         </div>

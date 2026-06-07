@@ -79,10 +79,10 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
       </Field>
 
       <Field label="Tipo" error={errors.tipo?.message}>
-        <select {...register("tipo")} className={inputClass}>
-          <option value="">Selecione...</option>
-          {tipoOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <input {...register("tipo")} list="tipos-receita" className={inputClass} placeholder="Selecione ou digite..." />
+        <datalist id="tipos-receita">
+          {tipoOptions.map((t) => <option key={t} value={t} />)}
+        </datalist>
       </Field>
 
       <div className="grid grid-cols-2 gap-4">
