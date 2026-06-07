@@ -6,6 +6,7 @@ import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
+import { useToast } from "@/components/ui/Toast";
 import { DespesaFixaForm, DespesaFixaFormData } from "@/components/forms/DespesaFixaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
@@ -30,6 +31,7 @@ export default function DespesasFixasPage() {
   const [filtro, setFiltro] = useState("");
   const [sort, setSort] = useState<SortState>(null);
   const [date, setDate] = useState(new Date());
+  const { toast } = useToast();
 
   const mes = date.getMonth() + 1;
   const ano = date.getFullYear();
@@ -54,7 +56,8 @@ export default function DespesasFixasPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); fetchData(); }
+    if (res.ok) { setModal(null); fetchData(); toast("Despesa criada"); }
+    else toast("Erro ao criar despesa", "error");
   };
 
   const handleEdit = async (data: DespesaFixaFormData) => {
@@ -66,13 +69,15 @@ export default function DespesasFixasPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); setSelected(null); fetchData(); }
+    if (res.ok) { setModal(null); setSelected(null); fetchData(); toast("Despesa atualizada"); }
+    else toast("Erro ao atualizar despesa", "error");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir esta despesa fixa?")) return;
-    await fetch(`/api/despesas-fixas/${id}`, { method: "DELETE" });
-    fetchData();
+    const res = await fetch(`/api/despesas-fixas/${id}`, { method: "DELETE" });
+    if (res.ok) { fetchData(); toast("Despesa excluída"); }
+    else toast("Erro ao excluir despesa", "error");
   };
 
   const handleConfirmar = async (item: DespesaFixa) => {
@@ -88,12 +93,13 @@ export default function DespesasFixasPage() {
       month = d.getMonth();
     }
     const proximo = addMonths(new Date(year, month, 1), 1);
-    await fetch(`/api/despesas-fixas/${item.id}`, {
+    const res = await fetch(`/api/despesas-fixas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataProximoVencimento: format(proximo, "yyyy-MM-dd") }),
     });
-    fetchData();
+    if (res.ok) { fetchData(); toast("Pagamento confirmado"); }
+    else toast("Erro ao confirmar pagamento", "error");
   };
 
   const handleReverter = async (item: DespesaFixa) => {
@@ -104,12 +110,13 @@ export default function DespesasFixasPage() {
     const prevIsAtOrBeforeStart =
       prevMonth.getFullYear() < ini.getUTCFullYear() ||
       (prevMonth.getFullYear() === ini.getUTCFullYear() && prevMonth.getMonth() + 1 <= ini.getUTCMonth() + 1);
-    await fetch(`/api/despesas-fixas/${item.id}`, {
+    const res = await fetch(`/api/despesas-fixas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataProximoVencimento: prevIsAtOrBeforeStart ? null : format(prevMonth, "yyyy-MM-dd") }),
     });
-    fetchData();
+    if (res.ok) { fetchData(); toast("Pagamento desfeito"); }
+    else toast("Erro ao desfazer pagamento", "error");
   };
 
   const openEdit = (item: DespesaFixa) => {

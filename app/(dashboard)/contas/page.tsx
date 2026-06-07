@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, Landmark } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +15,7 @@ interface ContaBancaria {
   id: string;
   nome: string;
   saldo: number;
+  updatedAt: string;
 }
 
 const schema = z.object({
@@ -78,6 +82,7 @@ export default function ContasPage() {
   const [modal, setModal] = useState<"create" | "edit" | null>(null);
   const [selected, setSelected] = useState<ContaBancaria | null>(null);
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,7 +101,8 @@ export default function ContasPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); fetchData(); }
+    if (res.ok) { setModal(null); fetchData(); toast("Conta criada"); }
+    else toast("Erro ao criar conta", "error");
   };
 
   const handleEdit = async (data: FormData) => {
@@ -108,13 +114,15 @@ export default function ContasPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); setSelected(null); fetchData(); }
+    if (res.ok) { setModal(null); setSelected(null); fetchData(); toast("Conta atualizada"); }
+    else toast("Erro ao atualizar conta", "error");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir esta conta?")) return;
-    await fetch(`/api/contas/${id}`, { method: "DELETE" });
-    fetchData();
+    const res = await fetch(`/api/contas/${id}`, { method: "DELETE" });
+    if (res.ok) { fetchData(); toast("Conta excluída"); }
+    else toast("Erro ao excluir conta", "error");
   };
 
   const openEdit = (item: ContaBancaria) => {
@@ -123,6 +131,9 @@ export default function ContasPage() {
   };
 
   const totalSaldo = items.reduce((sum, c) => sum + c.saldo, 0);
+  const oldestUpdate = items.length > 0
+    ? items.reduce((oldest, c) => new Date(c.updatedAt) < new Date(oldest.updatedAt) ? c : oldest)
+    : null;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -146,7 +157,14 @@ export default function ContasPage() {
             <div className="bg-emerald-100 p-2.5 rounded-xl">
               <Landmark className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="text-sm font-medium text-gray-700">Saldo total em contas</span>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Saldo total em contas</span>
+              {oldestUpdate && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Atualizado em {format(new Date(oldestUpdate.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+            </div>
           </div>
           <span className={`text-xl font-bold ${totalSaldo >= 0 ? "text-emerald-600" : "text-red-600"}`}>
             {formatCurrency(totalSaldo)}

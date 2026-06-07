@@ -6,6 +6,7 @@ import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
+import { useToast } from "@/components/ui/Toast";
 import { DespesaVariavelForm, DespesaVariavelPayload } from "@/components/forms/DespesaVariavelForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ export default function DespesasVariaveisPage() {
   const [filtro, setFiltro] = useState("");
   const [date, setDate] = useState(new Date());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   const mes = date.getMonth() + 1;
   const ano = date.getFullYear();
@@ -61,6 +63,12 @@ export default function DespesasVariaveisPage() {
     return item.parcelaAtual + diffMeses;
   };
 
+  const getEndDate = (item: DespesaVariavel): Date => {
+    const inicio = new Date(item.dataInicio);
+    const monthsToEnd = item.parcelasTotal - item.parcelaAtual;
+    return new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth() + monthsToEnd, 1));
+  };
+
   const isActiveInMonth = (item: DespesaVariavel) => {
     const p = getParcelaForMonth(item);
     return p >= 1 && p <= item.parcelasTotal;
@@ -80,7 +88,8 @@ export default function DespesasVariaveisPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); fetchData(); }
+    if (res.ok) { setModal(null); fetchData(); toast("Despesa criada"); }
+    else toast("Erro ao criar despesa", "error");
   };
 
   const handleEdit = async (data: DespesaVariavelPayload) => {
@@ -92,13 +101,15 @@ export default function DespesasVariaveisPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); setSelected(null); fetchData(); }
+    if (res.ok) { setModal(null); setSelected(null); fetchData(); toast("Despesa atualizada"); }
+    else toast("Erro ao atualizar despesa", "error");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir esta despesa variável?")) return;
-    await fetch(`/api/despesas-variaveis/${id}`, { method: "DELETE" });
-    fetchData();
+    const res = await fetch(`/api/despesas-variaveis/${id}`, { method: "DELETE" });
+    if (res.ok) { fetchData(); toast("Despesa excluída"); }
+    else toast("Erro ao excluir despesa", "error");
   };
 
   const handleConfirmar = async (item: DespesaVariavel) => {
@@ -107,7 +118,7 @@ export default function DespesasVariaveisPage() {
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
     const parcelaAtualCalc = getParcelaForMonth(item);
     const isLast = parcelaAtualCalc >= item.parcelasTotal;
-    await fetch(`/api/despesas-variaveis/${item.id}`, {
+    const res = await fetch(`/api/despesas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -116,7 +127,8 @@ export default function DespesasVariaveisPage() {
         ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
       }),
     });
-    fetchData();
+    if (res.ok) { fetchData(); toast("Pagamento confirmado"); }
+    else toast("Erro ao confirmar pagamento", "error");
   };
 
   const handleReverterVariavel = async (item: DespesaVariavel) => {
@@ -131,12 +143,13 @@ export default function DespesasVariaveisPage() {
       const oldDiffMeses = (ano - prevInicio.getFullYear()) * 12 + (mes - 1 - prevInicio.getMonth());
       body.parcelaAtual = item.parcelasTotal - oldDiffMeses;
     }
-    await fetch(`/api/despesas-variaveis/${item.id}`, {
+    const res = await fetch(`/api/despesas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    fetchData();
+    if (res.ok) { fetchData(); toast("Pagamento desfeito"); }
+    else toast("Erro ao desfazer pagamento", "error");
   };
 
   const openEdit = (item: DespesaVariavel) => {
@@ -311,14 +324,19 @@ export default function DespesasVariaveisPage() {
                                   <td className="px-4 py-3 text-sm font-medium text-gray-900 pl-14">{item.descricao}</td>
                                   <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
                                   <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium text-gray-900">{parcela}/{item.parcelasTotal}</span>
-                                      <div className="w-14 bg-gray-200 rounded-full h-1.5">
-                                        <div
-                                          className="bg-orange-400 rounded-full h-1.5"
-                                          style={{ width: `${(parcela / item.parcelasTotal) * 100}%` }}
-                                        />
+                                    <div className="flex flex-col gap-0.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-gray-900">{parcela}/{item.parcelasTotal}</span>
+                                        <div className="w-14 bg-gray-200 rounded-full h-1.5">
+                                          <div
+                                            className="bg-orange-400 rounded-full h-1.5"
+                                            style={{ width: `${(parcela / item.parcelasTotal) * 100}%` }}
+                                          />
+                                        </div>
                                       </div>
+                                      <span className="text-xs text-gray-400">
+                                        até {format(getEndDate(item), "MMM/yy", { locale: ptBR })}
+                                      </span>
                                     </div>
                                   </td>
                                   <td className="px-4 py-3 text-sm font-medium text-orange-600">{formatCurrency(item.valorParcela)}</td>

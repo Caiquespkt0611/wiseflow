@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         if (r.parcelada && r.mesesTotal) {
           const dataInicio = new Date(r.data);
           const diffMeses =
-            (ano - dataInicio.getFullYear()) * 12 + (mes - 1 - dataInicio.getMonth());
+            (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
           return diffMeses >= 0 && diffMeses < r.mesesTotal;
         }
         if (r.recorrente) {
@@ -67,15 +67,19 @@ export async function GET(req: NextRequest) {
 
     const totalReceitas = totalReceitasFixas + totalReceitasVar;
 
-    // Fixas: só conta se dataProximoVencimento for null (sem controle) ou <= fim do mês
+    // Fixas: só conta se dataInicio já chegou neste mês E (dataProximoVencimento é null ou <= fim do mês)
     const totalFixas = despesasFixas
-      .filter((d) => !d.dataProximoVencimento || new Date(d.dataProximoVencimento) <= fim)
+      .filter((d) => {
+        const ini = new Date(d.dataInicio);
+        if (ini.getUTCFullYear() > ano || (ini.getUTCFullYear() === ano && ini.getUTCMonth() + 1 > mes)) return false;
+        return !d.dataProximoVencimento || new Date(d.dataProximoVencimento) <= fim;
+      })
       .reduce((sum, d) => sum + d.valor, 0);
 
     const totalVariaveis = despesasVariaveis.reduce((sum, d) => {
       const dataInicio = new Date(d.dataInicio);
       const diffMeses =
-        (ano - dataInicio.getFullYear()) * 12 + (mes - 1 - dataInicio.getMonth());
+        (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
       const parcelaAtualCalc = d.parcelaAtual + diffMeses;
       if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal) {
         return sum + d.valorParcela;
