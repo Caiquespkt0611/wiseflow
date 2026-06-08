@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
-import { Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, Calculator, ChevronDown, ChevronUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -135,6 +135,25 @@ export default function ProjecaoPage() {
           Previsão acumulada partindo do saldo atual em contas ({formatCurrency(saldoBancario)})
         </p>
       </div>
+
+      {/* Alerta PSI negativo */}
+      {!loading && (() => {
+        const primeiraNegativa = data.find((d) => d.previsaoAcumulada < 0);
+        if (!primeiraNegativa) return null;
+        return (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4 mb-6 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700">
+                Saldo projetado fica negativo em {primeiraNegativa.label}
+              </p>
+              <p className="text-xs text-red-500 mt-0.5">
+                Previsão acumulada: {formatCurrency(primeiraNegativa.previsaoAcumulada)}. Revise suas despesas ou receitas para evitar o déficit.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Simulador */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6 overflow-hidden">

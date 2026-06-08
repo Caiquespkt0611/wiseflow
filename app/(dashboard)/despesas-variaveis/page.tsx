@@ -208,6 +208,18 @@ export default function DespesasVariaveisPage() {
     return i.parcelaAtual + diffMeses > i.parcelasTotal;
   });
 
+  // Total remaining debt per card (all non-completed items, from today forward)
+  const cardRestanteMap = new Map<string, number>();
+  for (const item of filtrados) {
+    const inicio = new Date(item.dataInicio);
+    const diffMeses = (nowAno - inicio.getUTCFullYear()) * 12 + (nowMes - 1 - inicio.getUTCMonth());
+    const parcelaAtualNow = item.parcelaAtual + diffMeses;
+    if (parcelaAtualNow > item.parcelasTotal) continue;
+    const remaining = (item.parcelasTotal - parcelaAtualNow + 1) * item.valorParcela;
+    const cartao = item.cartao || "Sem cartão";
+    cardRestanteMap.set(cartao, (cardRestanteMap.get(cartao) ?? 0) + remaining);
+  }
+
   // Group visible items by cartão
   const cardGroupsMap = new Map<string, CardGroup>();
   for (const item of allVisible) {
@@ -301,9 +313,16 @@ export default function DespesasVariaveisPage() {
                             {group.pagas.length} pago{group.pagas.length > 1 ? "s" : ""}
                           </span>
                         )}
-                        <span className={`text-sm font-bold mr-2 ${group.totalPendente > 0 ? "text-orange-600" : "text-gray-400"}`}>
-                          {formatCurrency(group.totalPendente)}
-                        </span>
+                        <div className="flex flex-col items-end mr-2">
+                          <span className={`text-sm font-bold ${group.totalPendente > 0 ? "text-orange-600" : "text-gray-400"}`}>
+                            {formatCurrency(group.totalPendente)}<span className="text-xs font-normal">/mês</span>
+                          </span>
+                          {(cardRestanteMap.get(group.cartao) ?? 0) > 0 && (
+                            <span className="text-xs text-gray-400">
+                              {formatCurrency(cardRestanteMap.get(group.cartao) ?? 0)} total
+                            </span>
+                          )}
+                        </div>
                         {expanded
                           ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                           : <ChevronRightIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />}
