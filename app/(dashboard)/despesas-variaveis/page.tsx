@@ -66,8 +66,11 @@ export default function DespesasVariaveisPage() {
 
   const getEndDate = (item: DespesaVariavel): Date => {
     const inicio = new Date(item.dataInicio);
-    const monthsToEnd = item.parcelasTotal - item.parcelaAtual;
-    return new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth() + monthsToEnd, 1));
+    const totalMonths = inicio.getUTCMonth() + (item.parcelasTotal - item.parcelaAtual);
+    const endYear = inicio.getUTCFullYear() + Math.floor(totalMonths / 12);
+    const endMonth = totalMonths % 12;
+    // Constrói Date local (sem conversão UTC→local) para que format() não mude o mês
+    return new Date(endYear, endMonth, 1);
   };
 
   const isActiveInMonth = (item: DespesaVariavel) => {
