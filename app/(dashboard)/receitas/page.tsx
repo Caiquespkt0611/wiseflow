@@ -6,6 +6,7 @@ import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
+import { useToast } from "@/components/ui/Toast";
 import { ReceitaForm, ReceitaPayload } from "@/components/forms/ReceitaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
@@ -51,6 +52,8 @@ export default function ReceitasPage() {
   const [sort, setSort] = useState<SortState>(null);
   const [feriasConfirm, setFeriasConfirm] = useState<ReceitaPayload | null>(null);
   const [date, setDate] = useState(new Date());
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const mes = date.getMonth() + 1;
   const ano = date.getFullYear();
@@ -110,7 +113,8 @@ export default function ReceitasPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); fetchData(); }
+    if (res.ok) { setModal(null); fetchData(); toast("Receita criada"); }
+    else toast("Erro ao criar receita", "error");
   };
 
   const handleFeriasConfirm = async () => {
@@ -160,6 +164,9 @@ export default function ReceitasPage() {
 
       setFeriasConfirm(null);
       fetchData();
+      toast("Férias registradas");
+    } else {
+      toast("Erro ao registrar férias", "error");
     }
     setSaving(false);
   };
@@ -173,26 +180,31 @@ export default function ReceitasPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); setSelected(null); fetchData(); }
+    if (res.ok) { setModal(null); setSelected(null); fetchData(); toast("Receita atualizada"); }
+    else toast("Erro ao atualizar receita", "error");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir esta receita?")) return;
-    await fetch(`/api/receitas/${id}`, { method: "DELETE" });
-    fetchData();
+    const res = await fetch(`/api/receitas/${id}`, { method: "DELETE" });
+    if (res.ok) { fetchData(); toast("Receita excluída"); }
+    else toast("Erro ao excluir receita", "error");
   };
 
   const handleReceber = async (item: Receita) => {
+    setLoadingActionId(item.id);
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
     if (item.parcelada) {
       const isLast = getParcelaAtualForMonth(item) >= (item.mesesTotal ?? 1);
       const payload = isLast ? { confirmadaAte, ativa: false } : { confirmadaAte };
-      await fetch(`/api/receitas/${item.id}`, {
+      const res = await fetch(`/api/receitas/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      fetchData();
+      setLoadingActionId(null);
+      if (res.ok) { fetchData(); toast("Recebimento confirmado"); }
+      else toast("Erro ao confirmar recebimento", "error");
       return;
     }
     const d = new Date(item.data);
@@ -200,15 +212,18 @@ export default function ReceitasPage() {
     const payload = item.recorrente
       ? { data: format(proxData, "yyyy-MM-dd"), confirmadaAte }
       : { data: format(proxData, "yyyy-MM-dd"), ativa: false, confirmadaAte };
-    await fetch(`/api/receitas/${item.id}`, {
+    const res = await fetch(`/api/receitas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    fetchData();
+    setLoadingActionId(null);
+    if (res.ok) { fetchData(); toast("Recebimento confirmado"); }
+    else toast("Erro ao confirmar recebimento", "error");
   };
 
   const handleReverterReceita = async (item: Receita) => {
+    setLoadingActionId(item.id);
     const payload: Record<string, unknown> = { confirmadaAte: null };
     if (!item.parcelada) {
       const d = new Date(item.data);
@@ -218,12 +233,14 @@ export default function ReceitasPage() {
     if (!item.ativa) {
       payload.ativa = true;
     }
-    await fetch(`/api/receitas/${item.id}`, {
+    const res = await fetch(`/api/receitas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    fetchData();
+    setLoadingActionId(null);
+    if (res.ok) { fetchData(); toast("Recebimento desfeito"); }
+    else toast("Erro ao desfazer recebimento", "error");
   };
 
   const handlePularMes = async () => {
@@ -234,24 +251,25 @@ export default function ReceitasPage() {
       setSkipMes("");
       return;
     }
-    await fetch(`/api/receitas/${skipModal.id}`, {
+    const res = await fetch(`/api/receitas/${skipModal.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ excecoes: [...existing, skipMes] }),
     });
     setSkipModal(null);
     setSkipMes("");
-    fetchData();
+    if (res.ok) { fetchData(); toast("Mês pulado"); }
+    else toast("Erro ao pular mês", "error");
   };
 
   const handleRemoverExcecao = async (item: Receita, mesKeyExc: string) => {
     const updated = (item.excecoes ?? []).filter((e) => e !== mesKeyExc);
-    await fetch(`/api/receitas/${item.id}`, {
+    const res = await fetch(`/api/receitas/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ excecoes: updated }),
     });
-    fetchData();
+    if (res.ok) fetchData();
   };
 
   const openEdit = (item: Receita) => {
@@ -396,7 +414,7 @@ export default function ReceitasPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
                               {isCurrentMonth && (
-                                <button onClick={() => handleReceber(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
+                                <button onClick={() => handleReceber(item)} disabled={loadingActionId === item.id} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40">
                                   <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                                 </button>
                               )}
@@ -438,8 +456,9 @@ export default function ReceitasPage() {
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => handleReverterReceita(item)}
+                                  disabled={loadingActionId === item.id}
                                   title="Desfazer recebimento"
-                                  className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
                                 >
                                   <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
                                 </button>

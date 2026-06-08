@@ -6,6 +6,7 @@ import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
+import { useToast } from "@/components/ui/Toast";
 import { ReceitaVariavelForm, ReceitaVariavelPayload } from "@/components/forms/ReceitaVariavelForm";
 import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -33,6 +34,8 @@ export default function ReceitasVariaveisPage() {
   const [filtro, setFiltro] = useState("");
   const [sort, setSort] = useState<SortState>(null);
   const [date, setDate] = useState(new Date());
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const mes = date.getMonth() + 1;
   const ano = date.getFullYear();
@@ -74,7 +77,8 @@ export default function ReceitasVariaveisPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); fetchData(); }
+    if (res.ok) { setModal(null); fetchData(); toast("Receita criada"); }
+    else toast("Erro ao criar receita", "error");
   };
 
   const handleEdit = async (data: ReceitaVariavelPayload) => {
@@ -86,36 +90,44 @@ export default function ReceitasVariaveisPage() {
       body: JSON.stringify(data),
     });
     setSaving(false);
-    if (res.ok) { setModal(null); setSelected(null); fetchData(); }
+    if (res.ok) { setModal(null); setSelected(null); fetchData(); toast("Receita atualizada"); }
+    else toast("Erro ao atualizar receita", "error");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir esta receita variável?")) return;
-    await fetch(`/api/receitas-variaveis/${id}`, { method: "DELETE" });
-    fetchData();
+    const res = await fetch(`/api/receitas-variaveis/${id}`, { method: "DELETE" });
+    if (res.ok) { fetchData(); toast("Receita excluída"); }
+    else toast("Erro ao excluir receita", "error");
   };
 
   const handleConfirmar = async (item: ReceitaVariavel) => {
+    setLoadingActionId(item.id);
     const d = new Date(item.dataInicio);
     const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
-    await fetch(`/api/receitas-variaveis/${item.id}`, {
+    const res = await fetch(`/api/receitas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataInicio: novaData, confirmadaAte }),
     });
-    fetchData();
+    setLoadingActionId(null);
+    if (res.ok) { fetchData(); toast("Recebimento confirmado"); }
+    else toast("Erro ao confirmar recebimento", "error");
   };
 
   const handleReverterReceitaVar = async (item: ReceitaVariavel) => {
+    setLoadingActionId(item.id);
     const d = new Date(item.dataInicio);
     const prevInicio = subMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
-    await fetch(`/api/receitas-variaveis/${item.id}`, {
+    const res = await fetch(`/api/receitas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataInicio: format(prevInicio, "yyyy-MM-dd"), confirmadaAte: null }),
     });
-    fetchData();
+    setLoadingActionId(null);
+    if (res.ok) { fetchData(); toast("Recebimento desfeito"); }
+    else toast("Erro ao desfazer recebimento", "error");
   };
 
   const openEdit = (item: ReceitaVariavel) => {
@@ -257,7 +269,7 @@ export default function ReceitasVariaveisPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
                               {isCurrentMonth && (
-                                <button onClick={() => handleConfirmar(item)} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group">
+                                <button onClick={() => handleConfirmar(item)} disabled={loadingActionId === item.id} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40">
                                   <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                                 </button>
                               )}
@@ -294,8 +306,9 @@ export default function ReceitasVariaveisPage() {
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => handleReverterReceitaVar(item)}
+                                    disabled={loadingActionId === item.id}
                                     title="Desfazer recebimento"
-                                    className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                    className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
                                   >
                                     <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
                                   </button>

@@ -40,6 +40,7 @@ export default function DespesasVariaveisPage() {
   const [filtro, setFiltro] = useState("");
   const [date, setDate] = useState(new Date());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const mes = date.getMonth() + 1;
@@ -113,6 +114,7 @@ export default function DespesasVariaveisPage() {
   };
 
   const handleConfirmar = async (item: DespesaVariavel) => {
+    setLoadingActionId(item.id);
     const d = new Date(item.dataInicio);
     const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
@@ -127,11 +129,13 @@ export default function DespesasVariaveisPage() {
         ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
       }),
     });
+    setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Pagamento confirmado"); }
     else toast("Erro ao confirmar pagamento", "error");
   };
 
   const handleReverterVariavel = async (item: DespesaVariavel) => {
+    setLoadingActionId(item.id);
     const d = new Date(item.dataInicio);
     const prevInicio = subMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
     const wasLast = item.parcelaAtual > item.parcelasTotal;
@@ -140,7 +144,7 @@ export default function DespesasVariaveisPage() {
       confirmadaAte: null,
     };
     if (wasLast) {
-      const oldDiffMeses = (ano - prevInicio.getFullYear()) * 12 + (mes - 1 - prevInicio.getMonth());
+      const oldDiffMeses = (ano - prevInicio.getUTCFullYear()) * 12 + (mes - 1 - prevInicio.getUTCMonth());
       body.parcelaAtual = item.parcelasTotal - oldDiffMeses;
     }
     const res = await fetch(`/api/despesas-variaveis/${item.id}`, {
@@ -148,6 +152,7 @@ export default function DespesasVariaveisPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Pagamento desfeito"); }
     else toast("Erro ao desfazer pagamento", "error");
   };
@@ -346,8 +351,9 @@ export default function DespesasVariaveisPage() {
                                       {isCurrentMonth && (
                                         <button
                                           onClick={() => handleConfirmar(item)}
+                                          disabled={loadingActionId === item.id}
                                           title="Confirmar pagamento"
-                                          className="p-1.5 hover:bg-emerald-50 rounded-lg group"
+                                          className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40"
                                         >
                                           <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                                         </button>
@@ -375,8 +381,9 @@ export default function DespesasVariaveisPage() {
                                       <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Pago</span>
                                       <button
                                         onClick={() => handleReverterVariavel(item)}
+                                        disabled={loadingActionId === item.id}
                                         title="Desfazer pagamento"
-                                        className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                        className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
                                       >
                                         <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
                                       </button>

@@ -31,6 +31,7 @@ export default function DespesasFixasPage() {
   const [filtro, setFiltro] = useState("");
   const [sort, setSort] = useState<SortState>(null);
   const [date, setDate] = useState(new Date());
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const mes = date.getMonth() + 1;
@@ -81,6 +82,7 @@ export default function DespesasFixasPage() {
   };
 
   const handleConfirmar = async (item: DespesaFixa) => {
+    setLoadingActionId(item.id);
     let year: number;
     let month: number;
     if (item.dataProximoVencimento) {
@@ -98,12 +100,14 @@ export default function DespesasFixasPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataProximoVencimento: format(proximo, "yyyy-MM-dd") }),
     });
+    setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Pagamento confirmado"); }
     else toast("Erro ao confirmar pagamento", "error");
   };
 
   const handleReverter = async (item: DespesaFixa) => {
     if (!item.dataProximoVencimento) return;
+    setLoadingActionId(item.id);
     const prox = new Date(item.dataProximoVencimento);
     const prevMonth = subMonths(new Date(prox.getUTCFullYear(), prox.getUTCMonth(), 1), 1);
     const ini = new Date(item.dataInicio);
@@ -115,6 +119,7 @@ export default function DespesasFixasPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataProximoVencimento: prevIsAtOrBeforeStart ? null : format(prevMonth, "yyyy-MM-dd") }),
     });
+    setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Pagamento desfeito"); }
     else toast("Erro ao desfazer pagamento", "error");
   };
@@ -251,8 +256,9 @@ export default function DespesasFixasPage() {
                             {isCurrentMonth && (
                               <button
                                 onClick={() => handleConfirmar(item)}
+                                disabled={loadingActionId === item.id}
                                 title="Confirmar pagamento"
-                                className="p-1.5 hover:bg-emerald-50 rounded-lg group"
+                                className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40"
                               >
                                 <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                               </button>
@@ -288,8 +294,9 @@ export default function DespesasFixasPage() {
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => handleReverter(item)}
+                                  disabled={loadingActionId === item.id}
                                   title="Desfazer pagamento"
-                                  className="p-1.5 hover:bg-orange-50 rounded-lg group"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
                                 >
                                   <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
                                 </button>
