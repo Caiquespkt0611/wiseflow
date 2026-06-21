@@ -26,9 +26,10 @@ interface Props {
   defaultValues?: Partial<DespesaVariavelFormData>;
   onSubmit: (data: DespesaVariavelPayload) => Promise<void>;
   loading?: boolean;
+  cartoes?: string[];
 }
 
-export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props) {
+export function DespesaVariavelForm({ defaultValues, onSubmit, loading, cartoes = [] }: Props) {
   const {
     register,
     handleSubmit,
@@ -41,6 +42,7 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
   const handleFormSubmit = (data: DespesaVariavelFormData) => {
     return onSubmit({
       ...data,
+      cartao: data.cartao.trim(),
       parcelaAtual: 1,
       valorTotal: data.valorParcela * data.parcelasTotal,
     });
@@ -54,23 +56,25 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading }: Props)
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Cartão" error={errors.cartao?.message}>
-          <input {...register("cartao")} list="cartoes-sugestoes" className={inputClass} placeholder="Ex: Nubank, Inter..." />
+          <input
+            {...register("cartao")}
+            list="cartoes-sugestoes"
+            className={inputClass}
+            placeholder="Selecione ou digite..."
+            autoComplete="off"
+          />
           <datalist id="cartoes-sugestoes">
-            <option value="Bradesco" />
-            <option value="C6 Bank" />
-            <option value="Cartão Emprestado" />
-            <option value="Inter" />
-            <option value="Itaú" />
-            <option value="Nubank" />
-            <option value="Santander" />
-            <option value="XP" />
+            {cartoes.map((c) => (
+              <option key={c} value={c} />
+            ))}
           </datalist>
         </Field>
         <Field label="Categoria" error={errors.categoria?.message}>
-          <input {...register("categoria")} list="categorias-despesa-var" className={inputClass} placeholder="Selecione ou digite..." />
-          <datalist id="categorias-despesa-var">
-            {CATEGORIAS.map((c) => <option key={c} value={c} />)}
-          </datalist>
+          <select {...register("categoria")} className={inputClass}>
+            {CATEGORIAS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </Field>
       </div>
 

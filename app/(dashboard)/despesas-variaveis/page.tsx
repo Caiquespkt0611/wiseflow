@@ -58,6 +58,9 @@ export default function DespesasVariaveisPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Unique card names from this user's data (for datalist suggestions)
+  const cartoesExistentes = Array.from(new Set(items.map((i) => i.cartao).filter(Boolean))).sort();
+
   const getParcelaForMonth = (item: DespesaVariavel) => {
     const inicio = new Date(item.dataInicio);
     const diffMeses = (ano - inicio.getUTCFullYear()) * 12 + (mes - 1 - inicio.getUTCMonth());
@@ -69,7 +72,6 @@ export default function DespesasVariaveisPage() {
     const totalMonths = inicio.getUTCMonth() + (item.parcelasTotal - item.parcelaAtual);
     const endYear = inicio.getUTCFullYear() + Math.floor(totalMonths / 12);
     const endMonth = totalMonths % 12;
-    // Constrói Date local (sem conversão UTC→local) para que format() não mude o mês
     return new Date(endYear, endMonth, 1);
   };
 
@@ -137,6 +139,32 @@ export default function DespesasVariaveisPage() {
     else toast("Erro ao confirmar pagamento", "error");
   };
 
+  const handleConfirmarTodos = async (group: CardGroup) => {
+    if (group.pendentes.length === 0) return;
+    setLoadingActionId(`group-${group.cartao}`);
+    const confirmadaAte = format(new Date(), "yyyy-MM-dd");
+    await Promise.all(
+      group.pendentes.map(({ item }) => {
+        const d = new Date(item.dataInicio);
+        const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
+        const parcelaAtualCalc = getParcelaForMonth(item);
+        const isLast = parcelaAtualCalc >= item.parcelasTotal;
+        return fetch(`/api/despesas-variaveis/${item.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dataInicio: novaData,
+            confirmadaAte,
+            ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
+          }),
+        });
+      })
+    );
+    setLoadingActionId(null);
+    fetchData();
+    toast(`Cartão ${group.cartao} marcado como pago`);
+  };
+
   const handleReverterVariavel = async (item: DespesaVariavel) => {
     setLoadingActionId(item.id);
     const d = new Date(item.dataInicio);
@@ -186,7 +214,6 @@ export default function DespesasVariaveisPage() {
     });
   };
 
-  // Filter by search
   const filtrados = filtro
     ? items.filter(
         (i) =>
@@ -196,13 +223,10 @@ export default function DespesasVariaveisPage() {
       )
     : items;
 
-  // Items active in selected month
   const ativas = filtrados.filter(isActiveInMonth);
-  // Items confirmed this month but data was advanced (no longer active in this month via filter)
   const confirmadasFora = filtrados.filter((i) => !isActiveInMonth(i) && isConfirmadaInMonth(i));
   const allVisible = [...ativas, ...confirmadasFora];
 
-  // Concluídas: all installments done as of today
   const nowMes = now.getMonth() + 1;
   const nowAno = now.getFullYear();
   const concluidas = filtrados.filter((i) => {
@@ -211,7 +235,6 @@ export default function DespesasVariaveisPage() {
     return i.parcelaAtual + diffMeses > i.parcelasTotal;
   });
 
-  // Total remaining debt per card (all non-completed items, from today forward)
   const cardRestanteMap = new Map<string, number>();
   for (const item of filtrados) {
     const inicio = new Date(item.dataInicio);
@@ -223,7 +246,6 @@ export default function DespesasVariaveisPage() {
     cardRestanteMap.set(cartao, (cardRestanteMap.get(cartao) ?? 0) + remaining);
   }
 
-  // Group visible items by cartão
   const cardGroupsMap = new Map<string, CardGroup>();
   for (const item of allVisible) {
     const cartao = item.cartao || "Sem cartão";
@@ -297,12 +319,13 @@ export default function DespesasVariaveisPage() {
                 {cardGroups.map((group) => {
                   const expanded = expandedCards.has(group.cartao);
                   const totalItens = group.pendentes.length + group.pagas.length;
+                  const isGroupLoading = loadingActionId === `group-${group.cartao}`;
                   return (
                     <div key={group.cartao}>
-                      {/* Card group header */}
-                      <button
+                      {/* Card group header — div instead of button to allow nested button */}
+                      <div
                         onClick={() => toggleCard(group.cartao)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
                       >
                         <div className="flex-shrink-0 w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center">
                           <CreditCard className="w-3.5 h-3.5 text-orange-500" />
@@ -315,6 +338,17 @@ export default function DespesasVariaveisPage() {
                           <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full mr-2">
                             {group.pagas.length} pago{group.pagas.length > 1 ? "s" : ""}
                           </span>
+                        )}
+                        {isCurrentMonth && group.pendentes.length > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleConfirmarTodos(group); }}
+                            disabled={loadingActionId !== null}
+                            title="Marcar todos como pagos"
+                            className="flex items-center gap-1 text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-2.5 py-1 rounded-lg transition-colors flex-shrink-0 mr-2"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            {isGroupLoading ? "Pagando..." : "Pagar tudo"}
+                          </button>
                         )}
                         <div className="flex flex-col items-end mr-2">
                           <span className={`text-sm font-bold ${group.totalPendente > 0 ? "text-orange-600" : "text-gray-400"}`}>
@@ -329,7 +363,7 @@ export default function DespesasVariaveisPage() {
                         {expanded
                           ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                           : <ChevronRightIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                      </button>
+                      </div>
 
                       {/* Expanded items */}
                       {expanded && (
@@ -373,7 +407,7 @@ export default function DespesasVariaveisPage() {
                                       {isCurrentMonth && (
                                         <button
                                           onClick={() => handleConfirmar(item)}
-                                          disabled={loadingActionId === item.id}
+                                          disabled={loadingActionId !== null}
                                           title="Confirmar pagamento"
                                           className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40"
                                         >
@@ -403,7 +437,7 @@ export default function DespesasVariaveisPage() {
                                       <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Pago</span>
                                       <button
                                         onClick={() => handleReverterVariavel(item)}
-                                        disabled={loadingActionId === item.id}
+                                        disabled={loadingActionId !== null}
                                         title="Desfazer pagamento"
                                         className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
                                       >
@@ -427,7 +461,7 @@ export default function DespesasVariaveisPage() {
                   );
                 })}
 
-                {/* Concluídas (always visible, management section) */}
+                {/* Concluídas */}
                 {concluidas.length > 0 && (
                   <div>
                     <div className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
@@ -461,12 +495,12 @@ export default function DespesasVariaveisPage() {
 
       {modal === "create" && (
         <Modal title="Nova Despesa Variável" onClose={() => setModal(null)}>
-          <DespesaVariavelForm onSubmit={handleCreate} loading={saving} />
+          <DespesaVariavelForm onSubmit={handleCreate} loading={saving} cartoes={cartoesExistentes} />
         </Modal>
       )}
       {modal === "edit" && selected && (
         <Modal title="Editar Despesa Variável" onClose={() => { setModal(null); setSelected(null); }}>
-          <DespesaVariavelForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} />
+          <DespesaVariavelForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} cartoes={cartoesExistentes} />
         </Modal>
       )}
     </div>
