@@ -96,7 +96,7 @@ export async function GET() {
     const dataInicio = new Date(d.dataInicio);
     const diffMeses = (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc < 1 || parcelaAtualCalc > d.parcelasTotal) continue;
+    if (parcelaAtualCalc < d.parcelaAtual || parcelaAtualCalc > d.parcelasTotal) continue;
 
     if (d.confirmadaAte) {
       const c = new Date(d.confirmadaAte);
@@ -124,7 +124,7 @@ export async function GET() {
     const dataInicio = new Date(r.dataInicio);
     const diffMeses = (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
     const parcelaAtualCalc = r.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc < 1 || parcelaAtualCalc > r.parcelasTotal) continue;
+    if (parcelaAtualCalc < r.parcelaAtual || parcelaAtualCalc > r.parcelasTotal) continue;
 
     if (r.confirmadaAte) {
       const c = new Date(r.confirmadaAte);

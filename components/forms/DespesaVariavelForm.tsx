@@ -36,7 +36,7 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading, cartoes 
     formState: { errors },
   } = useForm<DespesaVariavelFormData>({
     resolver: zodResolver(schema) as Resolver<DespesaVariavelFormData>,
-    defaultValues: { categoria: "Outros", ...defaultValues },
+    defaultValues: { categoria: "", ...defaultValues },
   });
 
   const handleFormSubmit = (data: DespesaVariavelFormData) => {
@@ -70,7 +70,8 @@ export function DespesaVariavelForm({ defaultValues, onSubmit, loading, cartoes 
           </datalist>
         </Field>
         <Field label="Categoria" error={errors.categoria?.message}>
-          <select {...register("categoria")} className={inputClass}>
+          <select {...register("categoria")} className={inputClass} defaultValue="">
+            <option value="" disabled>Selecione...</option>
             {CATEGORIAS.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}

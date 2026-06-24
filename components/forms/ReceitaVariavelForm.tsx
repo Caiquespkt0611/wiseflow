@@ -35,7 +35,7 @@ export function ReceitaVariavelForm({ defaultValues, onSubmit, loading }: Props)
     formState: { errors },
   } = useForm<ReceitaVariavelFormData>({
     resolver: zodResolver(schema) as Resolver<ReceitaVariavelFormData>,
-    defaultValues: { categoria: "Outros", ...defaultValues },
+    defaultValues: { ...defaultValues },
   });
 
   const handleFormSubmit = (data: ReceitaVariavelFormData) => {

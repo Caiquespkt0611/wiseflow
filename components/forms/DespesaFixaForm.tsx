@@ -30,7 +30,7 @@ export function DespesaFixaForm({ defaultValues, onSubmit, loading }: Props) {
     formState: { errors },
   } = useForm<DespesaFixaFormData>({
     resolver: zodResolver(schema) as Resolver<DespesaFixaFormData>,
-    defaultValues: { ativa: true, recorrente: true, categoria: "Outros", ...defaultValues },
+    defaultValues: { ativa: true, recorrente: true, ...defaultValues },
   });
 
   return (

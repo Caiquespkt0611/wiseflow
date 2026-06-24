@@ -123,15 +123,15 @@ export default function DespesasVariaveisPage() {
     const d = new Date(item.dataInicio);
     const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
-    const parcelaAtualCalc = getParcelaForMonth(item);
-    const isLast = parcelaAtualCalc >= item.parcelasTotal;
+    // Pagar = avança o vencimento E o ponteiro da próxima parcela não paga.
+    // Assim a parcela quitada sai da projeção (não fica só empurrada pra frente).
     const res = await fetch(`/api/despesas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         dataInicio: novaData,
         confirmadaAte,
-        ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
+        parcelaAtual: item.parcelaAtual + 1,
       }),
     });
     setLoadingActionId(null);
@@ -147,13 +147,11 @@ export default function DespesasVariaveisPage() {
     const updates = group.pendentes.map(({ item }) => {
       const d = new Date(item.dataInicio);
       const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
-      const parcelaAtualCalc = getParcelaForMonth(item);
-      const isLast = parcelaAtualCalc >= item.parcelasTotal;
       return {
         id: item.id,
         dataInicio: novaData,
         confirmadaAte,
-        ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
+        parcelaAtual: item.parcelaAtual + 1,
       };
     });
     const res = await fetch(`/api/despesas-variaveis/lote`, {
@@ -174,19 +172,15 @@ export default function DespesasVariaveisPage() {
     setLoadingActionId(item.id);
     const d = new Date(item.dataInicio);
     const prevInicio = subMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1);
-    const wasLast = item.parcelaAtual > item.parcelasTotal;
-    const body: Record<string, unknown> = {
-      dataInicio: format(prevInicio, "yyyy-MM-dd"),
-      confirmadaAte: null,
-    };
-    if (wasLast) {
-      const oldDiffMeses = (ano - prevInicio.getUTCFullYear()) * 12 + (mes - 1 - prevInicio.getUTCMonth());
-      body.parcelaAtual = item.parcelasTotal - oldDiffMeses;
-    }
+    // Desfazer = inverso do pagamento: volta o vencimento e o ponteiro da parcela.
     const res = await fetch(`/api/despesas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        dataInicio: format(prevInicio, "yyyy-MM-dd"),
+        confirmadaAte: null,
+        parcelaAtual: Math.max(1, item.parcelaAtual - 1),
+      }),
     });
     setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Pagamento desfeito"); }
@@ -242,11 +236,9 @@ export default function DespesasVariaveisPage() {
 
   const cardRestanteMap = new Map<string, number>();
   for (const item of filtrados) {
-    const inicio = new Date(item.dataInicio);
-    const diffMeses = (nowAno - inicio.getUTCFullYear()) * 12 + (nowMes - 1 - inicio.getUTCMonth());
-    const parcelaAtualNow = item.parcelaAtual + diffMeses;
-    if (parcelaAtualNow > item.parcelasTotal) continue;
-    const remaining = (item.parcelasTotal - parcelaAtualNow + 1) * item.valorParcela;
+    // Restante = parcelas ainda não pagas (de parcelaAtual até parcelasTotal).
+    if (item.parcelaAtual > item.parcelasTotal) continue; // concluída
+    const remaining = (item.parcelasTotal - item.parcelaAtual + 1) * item.valorParcela;
     const cartao = item.cartao || "Sem cartão";
     cardRestanteMap.set(cartao, (cardRestanteMap.get(cartao) ?? 0) + remaining);
   }

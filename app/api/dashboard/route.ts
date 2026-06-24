@@ -60,7 +60,7 @@ function calcVariaveis(
     const diffMeses =
       (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc < 1 || parcelaAtualCalc > d.parcelasTotal) return sum;
+    if (parcelaAtualCalc < d.parcelaAtual || parcelaAtualCalc > d.parcelasTotal) return sum;
     if (excluirConfirmadas && d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
     return sum + d.valorParcela;
   }, 0);
@@ -75,7 +75,7 @@ function calcReceitasVar(
   return variaveis.reduce((sum, r) => {
     const diffMeses = (ano - r.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - r.dataInicio.getUTCMonth());
     const parcelaAtualCalc = r.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc < 1 || parcelaAtualCalc > r.parcelasTotal) return sum;
+    if (parcelaAtualCalc < r.parcelaAtual || parcelaAtualCalc > r.parcelasTotal) return sum;
     if (excluirConfirmadas && r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
     return sum + r.valorParcela;
   }, 0);
@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
     const diffMeses =
       (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-    if (parcelaAtualCalc < 1 || parcelaAtualCalc > d.parcelasTotal) return false;
+    if (parcelaAtualCalc < d.parcelaAtual || parcelaAtualCalc > d.parcelasTotal) return false;
     if (d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return false;
     return true;
   });

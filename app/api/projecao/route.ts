@@ -59,7 +59,8 @@ export async function GET(req: NextRequest) {
       const dataInicio = new Date(r.dataInicio);
       const diffMeses = (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
       const parcelaAtualCalc = r.parcelaAtual + diffMeses;
-      if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= r.parcelasTotal) {
+      // parcelaAtual é a próxima parcela NÃO paga; parcelas abaixo dela já foram quitadas.
+      if (parcelaAtualCalc >= r.parcelaAtual && parcelaAtualCalc <= r.parcelasTotal) {
         return sum + r.valorParcela;
       }
       return sum;
@@ -81,7 +82,8 @@ export async function GET(req: NextRequest) {
       const diffMeses =
         (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
       const parcelaAtualCalc = d.parcelaAtual + diffMeses;
-      if (parcelaAtualCalc >= 1 && parcelaAtualCalc <= d.parcelasTotal) {
+      // parcelaAtual é a próxima parcela NÃO paga; parcelas abaixo dela já foram quitadas.
+      if (parcelaAtualCalc >= d.parcelaAtual && parcelaAtualCalc <= d.parcelasTotal) {
         return sum + d.valorParcela;
       }
       return sum;

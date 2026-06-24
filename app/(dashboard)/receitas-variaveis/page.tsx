@@ -106,10 +106,11 @@ export default function ReceitasVariaveisPage() {
     const d = new Date(item.dataInicio);
     const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
+    // Receber = avança o vencimento E o ponteiro da próxima parcela não recebida.
     const res = await fetch(`/api/receitas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataInicio: novaData, confirmadaAte }),
+      body: JSON.stringify({ dataInicio: novaData, confirmadaAte, parcelaAtual: item.parcelaAtual + 1 }),
     });
     setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Recebimento confirmado"); }
@@ -123,7 +124,7 @@ export default function ReceitasVariaveisPage() {
     const res = await fetch(`/api/receitas-variaveis/${item.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataInicio: format(prevInicio, "yyyy-MM-dd"), confirmadaAte: null }),
+      body: JSON.stringify({ dataInicio: format(prevInicio, "yyyy-MM-dd"), confirmadaAte: null, parcelaAtual: Math.max(1, item.parcelaAtual - 1) }),
     });
     setLoadingActionId(null);
     if (res.ok) { fetchData(); toast("Recebimento desfeito"); }
