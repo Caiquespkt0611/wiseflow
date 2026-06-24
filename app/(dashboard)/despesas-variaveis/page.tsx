@@ -143,26 +143,31 @@ export default function DespesasVariaveisPage() {
     if (group.pendentes.length === 0) return;
     setLoadingActionId(`group-${group.cartao}`);
     const confirmadaAte = format(new Date(), "yyyy-MM-dd");
-    await Promise.all(
-      group.pendentes.map(({ item }) => {
-        const d = new Date(item.dataInicio);
-        const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
-        const parcelaAtualCalc = getParcelaForMonth(item);
-        const isLast = parcelaAtualCalc >= item.parcelasTotal;
-        return fetch(`/api/despesas-variaveis/${item.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dataInicio: novaData,
-            confirmadaAte,
-            ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
-          }),
-        });
-      })
-    );
+    // Monta um único request atômico em vez de N PUTs paralelos (que pagavam parcialmente).
+    const updates = group.pendentes.map(({ item }) => {
+      const d = new Date(item.dataInicio);
+      const novaData = format(addMonths(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), 1), "yyyy-MM-dd");
+      const parcelaAtualCalc = getParcelaForMonth(item);
+      const isLast = parcelaAtualCalc >= item.parcelasTotal;
+      return {
+        id: item.id,
+        dataInicio: novaData,
+        confirmadaAte,
+        ...(isLast && { parcelaAtual: item.parcelasTotal + 1 }),
+      };
+    });
+    const res = await fetch(`/api/despesas-variaveis/lote`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
+    });
     setLoadingActionId(null);
-    fetchData();
-    toast(`Cartão ${group.cartao} marcado como pago`);
+    if (res.ok) {
+      await fetchData();
+      toast(`Cartão ${group.cartao} marcado como pago`);
+    } else {
+      toast(`Erro ao pagar cartão ${group.cartao}`, "error");
+    }
   };
 
   const handleReverterVariavel = async (item: DespesaVariavel) => {

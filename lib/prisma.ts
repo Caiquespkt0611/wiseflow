@@ -9,7 +9,10 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 1,
+    // Algumas conexões para suportar requests/queries concorrentes sem serializar
+    // tudo numa única conexão. Mantido baixo de propósito: em serverless cada
+    // instância abre seu próprio pool, então valores altos esgotariam o limite do Supabase.
+    max: 5,
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
