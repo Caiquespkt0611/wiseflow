@@ -81,8 +81,9 @@ if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
     erro "commite antes de publicar, ou use --sujo se for proposital"
     exit 1
   fi
+else
+  ok "árvore limpa"
 fi
-ok "árvore limpa"
 
 # Checagem específica do projeto, opcional, vinda do deploy.conf. É onde cada
 # projeto põe a prova que só ele tem — drift de schema, RLS, bater com planilha.
