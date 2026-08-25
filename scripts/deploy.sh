@@ -7,6 +7,7 @@
 #   npm run deploy -- --back  só o backend
 #   npm run deploy -- --front só o frontend
 #   npm run deploy -- --check confere tudo e não publica nada
+#   npm run deploy -- --sujo  publica o disco mesmo com árvore suja
 #
 # A regra que justifica existir: o frontend NUNCA sobe se o backend falhou ou
 # não voltou a responder. Publicar tela nova contra API velha é como o cliente
@@ -28,12 +29,13 @@ FRONT="${FRONT:-}"
 FRONT_DIR="${FRONT_DIR:-.}"
 FRONT_URL="${FRONT_URL:-}"
 
-SO_BACK=0; SO_FRONT=0; CHECAR=0
+SO_BACK=0; SO_FRONT=0; CHECAR=0; PERMITE_SUJO=0
 for arg in "$@"; do
   case "$arg" in
     --back)  SO_BACK=1 ;;
     --front) SO_FRONT=1 ;;
     --check|--dry-run) CHECAR=1 ;;
+    --sujo)  PERMITE_SUJO=1 ;;
     *) echo "opção desconhecida: $arg"; exit 1 ;;
   esac
 done
@@ -65,8 +67,32 @@ if [ -n "$GIT_EMAILS" ]; then
   ok "autor do commit: $ATUAL"
 fi
 
+# Árvore suja é o risco real, não o push (ver CEREBRO/operacional/deploy-padrao).
+# Isto era só um aviso e não bastou: em 25/08/2026 a Gestão InnovAdapt estava com
+# 2.561 linhas fora do git, o disco no ar e o git para trás. Um push de correção
+# republicou o commit velho contra um banco já migrado e derrubou as telas de
+# quem estava logado. Agora impede. Escape consciente: --sujo.
 if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
-  aviso "há mudança não commitada; vai subir o que está no disco"
+  if [ "$PERMITE_SUJO" = "1" ]; then
+    aviso "árvore suja, publicando o disco assim mesmo (--sujo)"
+  else
+    erro "há mudança não commitada; o git ficaria atrás do que está no ar"
+    git status --short | sed 's/^/       /'
+    erro "commite antes de publicar, ou use --sujo se for proposital"
+    exit 1
+  fi
+fi
+ok "árvore limpa"
+
+# Checagem específica do projeto, opcional, vinda do deploy.conf. É onde cada
+# projeto põe a prova que só ele tem — drift de schema, RLS, bater com planilha.
+if [ -n "${PRE_CHECK:-}" ]; then
+  if bash -c "$PRE_CHECK"; then
+    ok "PRE_CHECK do projeto passou"
+  else
+    erro "PRE_CHECK do projeto falhou; nada foi publicado"
+    exit 1
+  fi
 fi
 
 if [ "$FAZ_BACK" = "1" ]; then
