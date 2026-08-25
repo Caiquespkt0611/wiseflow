@@ -106,10 +106,24 @@ if [ "$FAZ_BACK" = "1" ]; then
 fi
 
 if [ "$FAZ_FRONT" = "1" ]; then
-  command -v vercel >/dev/null || { erro "vercel CLI não encontrada"; exit 1; }
-  [ -f "$FRONT_DIR/.vercel/project.json" ] || { erro "sem .vercel em $FRONT_DIR: rode 'vercel link'"; exit 1; }
-  NOME_VERCEL="$(python3 -c "import json;print(json.load(open('$FRONT_DIR/.vercel/project.json'))['projectName'])")"
-  ok "frontend: Vercel · $NOME_VERCEL ($FRONT_DIR)"
+  case "$FRONT" in
+    vercel)
+      command -v vercel >/dev/null || { erro "vercel CLI não encontrada"; exit 1; }
+      [ -f "$FRONT_DIR/.vercel/project.json" ] || { erro "sem .vercel em $FRONT_DIR: rode 'vercel link'"; exit 1; }
+      NOME_VERCEL="$(python3 -c "import json;print(json.load(open('$FRONT_DIR/.vercel/project.json'))['projectName'])")"
+      ok "frontend: Vercel · $NOME_VERCEL ($FRONT_DIR)"
+      ;;
+    hostinger)
+      # A Hostinger publica puxando do GitHub, pelo painel. Não há CLI: o que o
+      # script faz aqui é empurrar o commit e conferir se o site voltou.
+      git remote get-url origin >/dev/null 2>&1 || { erro "sem remoto origin: a Hostinger puxa do GitHub"; exit 1; }
+      ok "frontend: Hostinger · pull pelo hPanel a partir de $(git remote get-url origin | sed -E 's#.*/##')"
+      ;;
+    *)
+      erro "FRONT=\"$FRONT\" desconhecido no deploy.conf (use vercel ou hostinger)"
+      exit 1
+      ;;
+  esac
   [ -n "$FRONT_URL" ] && ok "produção: $FRONT_URL"
 fi
 
@@ -151,8 +165,21 @@ fi
 # ------------------------------------------------------------------ 2. FRONTEND
 if [ "$FAZ_FRONT" = "1" ]; then
   titulo "2/2  frontend"
-  ( cd "$FRONT_DIR" && vercel deploy --prod --yes )
-  ok "vercel deploy concluído"
+  case "$FRONT" in
+    vercel)
+      ( cd "$FRONT_DIR" && vercel deploy --prod --yes )
+      ok "vercel deploy concluído"
+      ;;
+    hostinger)
+      # Empurrar é tudo o que dá para automatizar: o pull é um botão no hPanel,
+      # sem CLI nem API aberta. O script leva o commit até o GitHub e avisa o
+      # que falta, em vez de fingir que publicou.
+      git push origin "$(git rev-parse --abbrev-ref HEAD)"
+      ok "commit $(git rev-parse --short HEAD) no GitHub"
+      aviso "agora no hPanel: seu site → Git → Deploy (ou Pull) para a Hostinger buscar"
+      aviso "a conferência abaixo só diz que o site responde, NÃO que já é a versão nova"
+      ;;
+  esac
 
   if [ -n "$FRONT_URL" ]; then
     printf "   conferindo o front"
