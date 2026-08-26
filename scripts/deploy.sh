@@ -114,10 +114,17 @@ if [ "$FAZ_FRONT" = "1" ]; then
       ok "frontend: Vercel · $NOME_VERCEL ($FRONT_DIR)"
       ;;
     hostinger)
-      # A Hostinger publica puxando do GitHub, pelo painel. Não há CLI: o que o
-      # script faz aqui é empurrar o commit e conferir se o site voltou.
+      # A Hostinger puxa do GitHub SOZINHA quando o auto-deploy está ligado:
+      # clona em hbuilds/last-source, roda npm install e build numa pasta nova em
+      # hbuilds/versions/<id>, e só então move o link hbuilds/current. Publicar,
+      # daqui, é empurrar o commit — não há botão a apertar.
       git remote get-url origin >/dev/null 2>&1 || { erro "sem remoto origin: a Hostinger puxa do GitHub"; exit 1; }
-      ok "frontend: Hostinger · pull pelo hPanel a partir de $(git remote get-url origin | sed -E 's#.*/##')"
+      ok "frontend: Hostinger · auto-deploy a partir de $(git remote get-url origin | sed -E 's#.*/##')"
+      if [ -n "${HOSTINGER_SSH:-}" ] && [ -n "${HOSTINGER_SOURCE:-}" ]; then
+        ok "confirmação por SSH ligada: dá para provar qual commit está no ar"
+      else
+        aviso "sem HOSTINGER_SSH no deploy.conf: não dá para confirmar a versão publicada"
+      fi
       ;;
     *)
       erro "FRONT=\"$FRONT\" desconhecido no deploy.conf (use vercel ou hostinger)"
@@ -171,13 +178,34 @@ if [ "$FAZ_FRONT" = "1" ]; then
       ok "vercel deploy concluído"
       ;;
     hostinger)
-      # Empurrar é tudo o que dá para automatizar: o pull é um botão no hPanel,
-      # sem CLI nem API aberta. O script leva o commit até o GitHub e avisa o
-      # que falta, em vez de fingir que publicou.
       git push origin "$(git rev-parse --abbrev-ref HEAD)"
-      ok "commit $(git rev-parse --short HEAD) no GitHub"
-      aviso "agora no hPanel: seu site → Git → Deploy (ou Pull) para a Hostinger buscar"
-      aviso "a conferência abaixo só diz que o site responde, NÃO que já é a versão nova"
+      ALVO="$(git rev-parse HEAD)"
+      ok "commit ${ALVO:0:7} no GitHub; a Hostinger puxa e reconstrói sozinha"
+
+      # Conferir de fora é impossível: os nomes dos arquivos do Next derivam do
+      # caminho dos módulos, não do conteúdo, e ficam iguais entre versões. Só o
+      # commit que está no servidor responde, e para isso é preciso entrar nele.
+      if [ -n "${HOSTINGER_SSH:-}" ] && [ -n "${HOSTINGER_SOURCE:-}" ]; then
+        printf "   aguardando a Hostinger construir"
+        CHEGOU=0
+        for _ in $(seq 1 40); do
+          LA="$(ssh $HOSTINGER_SSH -o BatchMode=yes -o ConnectTimeout=15 \
+                  "git -C $HOSTINGER_SOURCE rev-parse HEAD" 2>/dev/null || true)"
+          if [ "$LA" = "$ALVO" ]; then CHEGOU=1; break; fi
+          printf "."
+          sleep 15
+        done
+        printf "\n"
+        if [ "$CHEGOU" = "1" ]; then
+          ok "servidor está no commit ${ALVO:0:7} — build novo publicado"
+        else
+          aviso "o servidor ainda não está em ${ALVO:0:7} (último visto: ${LA:0:7})"
+          aviso "o auto-deploy pode estar desligado: hPanel → site → Git → Deploy"
+        fi
+      else
+        aviso "sem HOSTINGER_SSH: a conferência abaixo só diz que o site responde,"
+        aviso "NÃO que já é a versão nova"
+      fi
       ;;
   esac
 
