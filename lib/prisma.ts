@@ -6,13 +6,28 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+/**
+ * O pooler do Supabase na porta 5432 é modo sessão: cada conexão fica presa ao
+ * cliente e o teto é de 15 no total. Em serverless várias instâncias sobem ao
+ * mesmo tempo e estouram esse teto, e a API responde 500 com EMAXCONNSESSION
+ * (o que na tela vira "sumiram meus dados"). A porta 6543 é o modo transação,
+ * onde a conexão volta para o pool a cada query e o teto é muito maior.
+ */
+function urlDoBanco(): string | undefined {
+  const url = process.env.DATABASE_URL;
+  if (!url) return url;
+  if (!url.includes("pooler.supabase.com:5432")) return url;
+  return url.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543");
+}
+
 function createPrismaClient() {
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    // Algumas conexões para suportar requests/queries concorrentes sem serializar
-    // tudo numa única conexão. Mantido baixo de propósito: em serverless cada
-    // instância abre seu próprio pool, então valores altos esgotariam o limite do Supabase.
-    max: 5,
+    connectionString: urlDoBanco(),
+    // Poucas conexões por instância, e devolvidas rápido: em modo transação
+    // isso basta para as queries concorrentes do dashboard sem segurar o pool.
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
