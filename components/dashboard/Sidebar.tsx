@@ -20,12 +20,14 @@ import {
   TrendingDown,
   TrendingUp as TrendingUpIcon,
   AlertCircle,
+  Mic,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Alerta } from "@/app/api/alertas/route";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/lancar", label: "Lançar por voz", icon: Mic },
   { href: "/receitas", label: "Receitas Fixas", icon: DollarSign },
   { href: "/receitas-variaveis", label: "Receitas Variáveis", icon: Coins },
   { href: "/despesas-fixas", label: "Despesas Fixas", icon: MinusCircle },
