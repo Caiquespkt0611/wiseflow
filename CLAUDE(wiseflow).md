@@ -45,6 +45,8 @@ npm run db:studio     # Open Prisma Studio GUI
 | `/despesas-variaveis` | Credit card purchases in installments, grouped by card |
 | `/contas` | Bank account balances used in projection |
 | `/projecao` | 12-month forward-looking balance forecast |
+| `/lancar` | Voice entry; Claude structures the sentence, user confirms before saving |
+| `/fatura` | Card statement import (PDF or photo); reconciles against existing entries |
 
 ### Data Flow
 
@@ -77,9 +79,21 @@ NextAuth configured in `lib/auth.ts` with a CredentialsProvider. JWT callbacks e
 - **Receita** — fixed income; fields `recorrente`, `parcelada`, `mesesTotal`, `excecoes` (JSON), `ativa`
 - **ReceitaVariavel** — installment income; `parcelaAtual`, `parcelasTotal`, `valorParcela`, `dataInicio`
 - **DespesaFixa** — bills; `dataProximoVencimento` advances on confirmation
-- **DespesaVariavel** — card purchases; `cartao`, `parcelaAtual`, `parcelasTotal`, `dataInicio`
+- **DespesaVariavel** — card purchases; `cartao`, `parcelaAtual`, `parcelasTotal`, `dataInicio`, plus `origem`/`importacaoId`/`conferidaEm` for statement imports
+- **ImportacaoFatura** — one statement import batch; keeps what it created and what it merely marked as checked, so the whole batch can be undone
 
 All models have `userId` and cascade-delete on user removal.
+
+### Statement Import (`app/api/fatura/*`, `lib/fatura.ts`, `lib/fatura-leitura.ts`)
+
+A statement never replaces the month. `DespesaVariavel` is the whole purchase, not the month's spend, so wiping a month and re-creating it from the statement would restart running installments and ruin `/projecao`. The flow is reconciliation instead:
+
+1. `lib/fatura-leitura.ts` sends the PDF/images to Claude (`claude-opus-5`, structured output) and returns the statement lines classified as `compra`, `encargo`, `estorno` or `pagamento`.
+2. `conciliar()` in `lib/fatura.ts` matches lines against the entries that fall in that month for that card. The parcel amount is the strong key (statement descriptions are unusable); the description only breaks ties. Result: **já tem** (checked, nothing created), **novo** (created) and **sumiu** (expected, absent from the statement — reported, never touched).
+3. The sum of the lines is compared with the statement total the user types in. That is the only guard against a cropped screenshot or a misread value.
+4. `DELETE /api/fatura/[id]` undoes a whole batch: deletes what it created, clears the `conferidaEm` it set.
+
+Image reading has no free local fallback like voice does — without `ANTHROPIC_API_KEY` the route returns `sem_chave` and the page says so.
 
 ### Shared Patterns
 

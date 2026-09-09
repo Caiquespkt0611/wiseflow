@@ -19,6 +19,7 @@ model User {
   despesasFixas      DespesaFixa[]
   despesasVariaveis  DespesaVariavel[]
   contasBancarias    ContaBancaria[]
+  importacoesFatura  ImportacaoFatura[]
 
   @@map("users")
 }
@@ -112,9 +113,41 @@ model DespesaVariavel {
   responsavel   String
   dataInicio    DateTime
   confirmadaAte DateTime?
+
+  // Origem do registro: "manual" (digitado ou por voz) ou "fatura" (veio de uma importação).
+  // conferidaEm marca a despesa que a fatura confirmou, sem criar nada novo.
+  origem       String            @default("manual")
+  importacaoId String?
+  importacao   ImportacaoFatura? @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
+  conferidaEm  DateTime?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([userId])
+  @@index([importacaoId])
   @@map("despesas_variaveis")
+}
+
+/// Um lote de importação de fatura. Guarda o que foi criado e o que foi apenas
+/// marcado como conferido, para que a importação inteira possa ser desfeita.
+model ImportacaoFatura {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cartao         String
+  mesRef         String
+  totalInformado Float?
+  totalLido      Float
+  itensLidos     Int
+  criadas        Int
+  conferidas     String[] @default([])
+  arquivos       String[] @default([])
+  createdAt      DateTime @default(now())
+
+  despesas DespesaVariavel[]
+
+  @@index([userId])
+  @@index([userId, cartao, mesRef])
+  @@map("importacoes_fatura")
 }

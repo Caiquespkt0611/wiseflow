@@ -63,9 +63,24 @@ async function main() {
   }
   if (permissivas.length === 0) console.log('ok: nenhuma policy valendo para todos os papéis')
 
-  // 1b. tabela com RLS e sem policy nenhuma fica invisível até para o
+  // 2. RLS ligado em tudo — tabela sem RLS é a porta escancarada
+  const tabelas = await consultar(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
+  )
+  for (const { tablename } of tabelas) {
+    await executar(`ALTER TABLE public."${tablename}" ENABLE ROW LEVEL SECURITY`)
+    await executar(
+      `REVOKE ALL ON public."${tablename}" FROM ${PUBLICOS.join(', ')}`,
+    )
+  }
+  console.log(`ok: RLS ligado e grants revogados em ${tabelas.length} tabelas`)
+
+  // 3. tabela com RLS e sem policy nenhuma fica invisível até para o
   // service_role. Não é risco — é inconsistência, e inconsistência vira ruído
-  // na próxima varredura. Dá a ela a mesma policy que as outras cinco têm.
+  // na próxima varredura. Dá a ela a mesma policy que as outras têm.
+  // Roda depois do passo 2 de propósito: tabela recém-criada chega aqui sem
+  // RLS, e se este bloco viesse antes ela só ganharia policy na segunda
+  // execução do script.
   const semPolicy = await consultar(
     `SELECT c.relname AS tabela
        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -80,19 +95,7 @@ async function main() {
     console.log(`ok: ${tabela} ganhou policy de service_role`)
   }
 
-  // 2. RLS ligado em tudo — tabela sem RLS é a porta escancarada
-  const tabelas = await consultar(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
-  )
-  for (const { tablename } of tabelas) {
-    await executar(`ALTER TABLE public."${tablename}" ENABLE ROW LEVEL SECURITY`)
-    await executar(
-      `REVOKE ALL ON public."${tablename}" FROM ${PUBLICOS.join(', ')}`,
-    )
-  }
-  console.log(`ok: RLS ligado e grants revogados em ${tabelas.length} tabelas`)
-
-  // 3. sequences, funções e o que ainda nem existe
+  // 4. sequences, funções e o que ainda nem existe
   await executar(
     `REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${PUBLICOS.join(', ')}`,
   )
@@ -106,7 +109,7 @@ async function main() {
   }
   console.log('ok: sequences, funções e default privileges fechados')
 
-  // 4. prova
+  // 5. prova
   const abertas = await consultar(
     `SELECT c.relname,
             has_table_privilege('anon', c.oid, 'SELECT') AS anon,
