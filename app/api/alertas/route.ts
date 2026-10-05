@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hojeUTC, parcelasEmAberto, valorDaParcela, vencimento } from "@/lib/emprestimos";
 
 export type Alerta = {
   id: string;
-  tipo: "receita" | "despesa_fixa" | "despesa_variavel" | "receita_variavel";
+  tipo: "receita" | "despesa_fixa" | "despesa_variavel" | "receita_variavel" | "emprestimo";
   descricao: string;
   valor: number;
   diaVencimento: number;
@@ -27,11 +28,12 @@ export async function GET() {
   const ano = now.getFullYear();
   const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
 
-  const [receitas, despesasFixas, despesasVariaveis, receitasVariaveis] = await Promise.all([
+  const [receitas, despesasFixas, despesasVariaveis, receitasVariaveis, emprestimos] = await Promise.all([
     prisma.receita.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
     prisma.receitaVariavel.findMany({ where: { userId: session.user.id } }),
+    prisma.emprestimo.findMany({ where: { userId: session.user.id, pagamento: "conta" } }),
   ]);
 
   const alertas: Alerta[] = [];
@@ -141,6 +143,27 @@ export async function GET() {
       diasAteVencimento: diasAte,
       responsavel: r.responsavel,
       extra: `Parcela ${parcelaAtualCalc}/${r.parcelasTotal}`,
+    });
+  }
+
+  // Empréstimos que saem da conta: a próxima parcela em aberto
+  const hoje = hojeUTC();
+  for (const e of emprestimos) {
+    const k = parcelasEmAberto(e, hoje)[0];
+    if (!k) continue;
+    const v = vencimento(e, k);
+    const diasAte = Math.round((v.getTime() - hoje.getTime()) / 86_400_000);
+    if (diasAte < -WINDOW_BEFORE || diasAte > WINDOW_AFTER) continue;
+
+    alertas.push({
+      id: e.id,
+      tipo: "emprestimo",
+      descricao: `Empréstimo ${e.apelido}`,
+      valor: valorDaParcela(e, k),
+      diaVencimento: v.getUTCDate(),
+      diasAteVencimento: diasAte,
+      responsavel: "",
+      extra: `Parcela ${k}/${e.parcelasTotal} • ${e.banco}`,
     });
   }
 

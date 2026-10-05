@@ -18,6 +18,8 @@ import {
   Plus,
   MoreHorizontal,
   X,
+  Route,
+  Scissors,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useLancador } from "@/components/lancar/LancadorGlobal";
@@ -44,6 +46,13 @@ const grupos = [
     itens: [
       { href: "/despesas-fixas", label: "Contas do mês", icon: Repeat },
       { href: "/despesas-variaveis", label: "Cartões e parcelas", icon: CreditCard },
+    ],
+  },
+  {
+    titulo: "Planejamento",
+    itens: [
+      { href: "/quitacao", label: "Quitar empréstimos", icon: Route },
+      { href: "/economizar", label: "Onde economizar", icon: Scissors },
     ],
   },
   {
@@ -288,7 +297,7 @@ function Aba({ href, label, icon: Icon, ativo }: { href: string; label: string; 
 
 function AlertasPanel({ alertas, onClose }: { alertas: Alerta[]; onClose: () => void }) {
   const receitas = alertas.filter((a) => a.tipo === "receita" || a.tipo === "receita_variavel");
-  const despesas = alertas.filter((a) => a.tipo === "despesa_fixa" || a.tipo === "despesa_variavel");
+  const despesas = alertas.filter((a) => a.tipo === "despesa_fixa" || a.tipo === "despesa_variavel" || a.tipo === "emprestimo");
 
   return (
     <>

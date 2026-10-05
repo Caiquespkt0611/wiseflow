@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cobradoNoMes, hojeUTC } from "@/lib/emprestimos";
 
 function calcReceitas(
   receitas: { valor: number; recorrente: boolean; parcelada: boolean; ativa: boolean; data: Date; mesesTotal?: number | null; excecoes?: string[] | null; confirmadaAte?: Date | null }[],
@@ -106,13 +107,20 @@ export async function GET(req: NextRequest) {
   const inicio = new Date(Date.UTC(ano, mes - 1, 1));
   const fim = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
 
-  const [todasReceitas, todasFixas, todasVariaveis, todasReceitasVar, contasBancarias] = await Promise.all([
+  const [todasReceitas, todasFixas, todasVariaveis, todasReceitasVar, contasBancarias, emprestimos] = await Promise.all([
     prisma.receita.findMany({ where: { userId: session.user.id } }),
     prisma.despesaFixa.findMany({ where: { userId: session.user.id, ativa: true } }),
     prisma.despesaVariavel.findMany({ where: { userId: session.user.id } }),
     prisma.receitaVariavel.findMany({ where: { userId: session.user.id } }),
     prisma.contaBancaria.findMany({ where: { userId: session.user.id } }),
+    prisma.emprestimo.findMany({ where: { userId: session.user.id } }),
   ]);
+
+  // Parcela de empréstimo que sai da conta no mês. No mês atual entra também a
+  // atrasada ainda não marcada como paga, como as contas do mês.
+  const hoje = hojeUTC();
+  const calcEmprestimos = (m: number, a: number) =>
+    emprestimos.reduce((s, e) => s + cobradoNoMes(e, a, m, hoje, m === mesAtual && a === anoAtual), 0);
 
   const saldoBancarioReal = contasBancarias.reduce((sum, c) => sum + c.saldo, 0);
 
@@ -128,7 +136,7 @@ export async function GET(req: NextRequest) {
       const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       const f = calcFixas(todasFixas.map(x => ({ ...x, dataInicio: new Date(x.dataInicio), dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), m, a);
       const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
-      saldoEfetivo += r + rv - f - v;
+      saldoEfetivo += r + rv - f - calcEmprestimos(m, a) - v;
       m++;
       if (m > 12) { m = 1; a++; }
     }
@@ -142,7 +150,8 @@ export async function GET(req: NextRequest) {
   const totalReceitasFixas = calcReceitas(receitasFixadas, inicio, fim, mes, ano);
   const totalReceitasVariaveis = calcReceitasVar(receitasVarFixadas, mes, ano);
   const totalReceitas = totalReceitasFixas + totalReceitasVariaveis;
-  const totalFixas = calcFixas(fixasFixadas, mes, ano);
+  const totalEmprestimos = calcEmprestimos(mes, ano);
+  const totalFixas = calcFixas(fixasFixadas, mes, ano) + totalEmprestimos;
   const totalVariaveis = calcVariaveis(variaveisFixadas, mes, ano);
   const totalDespesas = totalFixas + totalVariaveis;
   const previsao = saldoEfetivo + totalReceitas - totalDespesas;
@@ -157,9 +166,10 @@ export async function GET(req: NextRequest) {
     const proxMes = d.dataProximoVencimento.getUTCMonth() + 1;
     return proxAno < ano || (proxAno === ano && proxMes <= mes);
   });
-  const categoriasFixas = groupByCategoria(
-    fixasFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valor }))
-  );
+  const categoriasFixas = groupByCategoria([
+    ...fixasFiltradas.map((d) => ({ categoria: (d as { categoria?: string }).categoria ?? "Outros", valor: d.valor })),
+    ...(totalEmprestimos > 0 ? [{ categoria: "Empréstimo", valor: totalEmprestimos }] : []),
+  ]);
 
   const variaveisFiltradas = variaveisFixadas.filter((d) => {
     const diffMeses =

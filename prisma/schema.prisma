@@ -14,12 +14,19 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Quanto o plano de quitação nunca deixa a conta ficar abaixo. Nulo = usa a sugestão.
+  reservaMinima Float?
+  // Quanto o plano supõe de cartão por mês quando o lançado for menor (compra
+  // futura ainda não existe na projeção). Nulo = usa a sugestão.
+  cartaoMensal  Float?
+
   receitas           Receita[]
   receitasVariaveis  ReceitaVariavel[]
   despesasFixas      DespesaFixa[]
   despesasVariaveis  DespesaVariavel[]
   contasBancarias    ContaBancaria[]
   importacoesFatura  ImportacaoFatura[]
+  emprestimos        Emprestimo[]
 
   @@map("users")
 }
@@ -150,4 +157,46 @@ model ImportacaoFatura {
   @@index([userId])
   @@index([userId, cartao, mesRef])
   @@map("importacoes_fatura")
+}
+
+/// Empréstimo com os dados do contrato. Não é despesa fixa: tem fim, tem taxa e
+/// pode ser antecipado, e é isso que o plano de quitação precisa saber.
+/// A parcela k vence em primeiroVencimento + (k-1) meses (ou anos, se anual).
+model Emprestimo {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  apelido    String // como o casal chama: "Silicone", "Cruzeiro"
+  banco      String
+  contrato   String?
+  modalidade String
+
+  // "conta": sai da conta e entra na projeção.
+  // "folha": desconta no salário, que já é lançado líquido. Fica fora da
+  //          projeção; quitado, o salário volta a ter o valor da parcela.
+  // "fgts":  sai do FGTS (saque-aniversário). Não mexe no caixa.
+  pagamento     String
+  periodicidade String @default("mensal") // "mensal" | "anual"
+
+  valorContratado Float
+  taxaMensal      Float // juros do contrato, % ao mês. É a taxa do desconto na antecipação
+  cetMensal       Float?
+  taxaEstimada    Boolean @default(false) // calculada pela parcela, sem o contrato em mãos
+
+  parcelasTotal      Int
+  valorParcela       Float
+  valoresParcelas    Float[]  @default([]) // quando cada parcela tem um valor (FGTS)
+  primeiroVencimento DateTime
+
+  proximaParcela      Int       @default(1) // a próxima que ainda não foi paga
+  parcelasAntecipadas Int       @default(0) // últimas parcelas já quitadas por antecipação
+  quitadoEm           DateTime?
+  observacao          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("emprestimos")
 }
