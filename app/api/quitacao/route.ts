@@ -72,15 +72,31 @@ export async function GET(req: NextRequest) {
       restante: restanteNominal(e, hoje),
       quitarHoje: custoQuitar(e, hoje, hoje),
       atrasadas: abertas.length - naData.length,
+      antecipaveis: naData.length, // o que um pagamento hoje ainda alcança
     };
   });
+
+  // Sugestão de hoje, por empréstimo: quantas últimas parcelas antecipar
+  // (todas = quitar). A pessoa decide; a tela só pré-preenche se ela pedir.
+  const hojeIso = hoje.toISOString().slice(0, 10);
+  const sugestoes: Record<string, number> = {};
+  for (const a of plano.acoes) {
+    if (a.data !== hojeIso) continue;
+    const e = emprestimos.find((x) => x.id === a.emprestimoId);
+    if (!e) continue;
+    sugestoes[a.emprestimoId] = (sugestoes[a.emprestimoId] ?? 0) + (a.tipo === "quitar" ? e.antecipaveis : a.parcelas);
+  }
 
   return NextResponse.json({
     hoje: hoje.toISOString(),
     saldoBancario,
     config: { reserva, reservaSugerida: reservaSug, cartao, cartaoSugerido: cartaoSug, salvo: { reserva: usuario?.reservaMinima ?? null, cartao: usuario?.cartaoMensal ?? null } },
     emprestimos,
-    plano,
+    // meses: igual à tela de Projeção, é o que a pessoa compara.
+    // mesesPlano: com o piso do cartão, só para as sugestões não contarem com folga que não existe.
+    meses: mesesBase(projecao),
+    mesesPlano: base,
+    sugestoes,
   });
 }
 

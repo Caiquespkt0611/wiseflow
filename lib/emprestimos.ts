@@ -205,6 +205,53 @@ export interface Plano {
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+/** Antecipa as `qtd` últimas parcelas. Todas = quitado hoje. */
+export function aplicarEscolha(e: EmprestimoBase, qtd: number, hoje: Date): EmprestimoBase {
+  const total = abertasNaData(e, hoje, hoje).length;
+  if (qtd <= 0 || total === 0) return e;
+  if (qtd >= total) return { ...e, quitadoEm: hoje };
+  return { ...e, parcelasAntecipadas: e.parcelasAntecipadas + qtd };
+}
+
+/** Parcelas que saem da conta no mês (no mês 0, com as atrasadas). */
+export function parcelasDoMes(lista: EmprestimoBase[], m: MesBase, i: number, hoje: Date): number {
+  return lista.reduce((s, e) => s + cobradoNoMes(e, m.ano, m.mes, hoje, i === 0), 0);
+}
+
+/**
+ * Quanto sobra no mês. `refs` são os contratos como estavam antes de qualquer
+ * antecipação: é contra eles que se mede o salário que volta do consignado.
+ */
+export function fluxoDoMes(lista: EmprestimoBase[], refs: Map<string, EmprestimoBase>, m: MesBase, i: number, hoje: Date): number {
+  const devolvido = lista.reduce((s, e) => s + devolvidoAoSalario(e, refs.get(e.id) ?? e, m.ano, m.mes, hoje), 0);
+  return m.receitas + devolvido - m.despesas - parcelasDoMes(lista, m, i, hoje);
+}
+
+export interface MesSaldo {
+  ano: number;
+  mes: number;
+  label: string;
+  saldo: number;
+  parcelas: number;
+}
+
+/** Saldo no fim de cada mês, com um pagamento feito hoje. */
+export function serieSaldo(opts: {
+  meses: MesBase[];
+  saldoInicial: number;
+  emprestimos: EmprestimoBase[];
+  originais?: EmprestimoBase[];
+  hoje: Date;
+  pagoHoje?: number;
+}): MesSaldo[] {
+  const refs = new Map((opts.originais ?? opts.emprestimos).map((e) => [e.id, e]));
+  let saldo = opts.saldoInicial - (opts.pagoHoje ?? 0);
+  return opts.meses.map((m, i) => {
+    saldo += fluxoDoMes(opts.emprestimos, refs, m, i, opts.hoje);
+    return { ano: m.ano, mes: m.mes, label: m.label, saldo, parcelas: parcelasDoMes(opts.emprestimos, m, i, opts.hoje) };
+  });
+}
+
 /**
  * Simula mês a mês. Em cada mês, o dinheiro livre é o quanto o saldo pode cair
  * sem que nenhum mês daqui para a frente fique abaixo da reserva. Esse dinheiro
@@ -219,6 +266,7 @@ export function simularPlano(opts: {
   meses: MesBase[];
   saldoInicial: number;
   emprestimos: EmprestimoBase[];
+  originais?: EmprestimoBase[]; // contratos antes da escolha de hoje, para o salário do consignado
   reserva: number;
   hoje: Date;
   minimoAcao?: number;
@@ -227,16 +275,12 @@ export function simularPlano(opts: {
   const { meses, saldoInicial, reserva, hoje } = opts;
   const minimoAcao = opts.minimoAcao ?? 500;
   const diaDaAcao = opts.diaDaAcao ?? 15;
-  const originais = opts.emprestimos.filter((e) => !estaQuitado(e, hoje));
+  const originais = opts.emprestimos;
   const estado = originais.map((e) => ({ ...e }));
-  const original = new Map(originais.map((e) => [e.id, e]));
+  const refs = new Map((opts.originais ?? originais).map((e) => [e.id, e]));
 
-  const parcelasConta = (lista: EmprestimoBase[], m: MesBase, i: number) =>
-    lista.reduce((s, e) => s + cobradoNoMes(e, m.ano, m.mes, hoje, i === 0), 0);
-  const devolvido = (lista: EmprestimoBase[], m: MesBase) =>
-    lista.reduce((s, e) => s + devolvidoAoSalario(e, original.get(e.id)!, m.ano, m.mes, hoje), 0);
-  const fluxo = (lista: EmprestimoBase[], m: MesBase, i: number) =>
-    m.receitas + devolvido(lista, m) - m.despesas - parcelasConta(lista, m, i);
+  const parcelasConta = (lista: EmprestimoBase[], m: MesBase, i: number) => parcelasDoMes(lista, m, i, hoje);
+  const fluxo = (lista: EmprestimoBase[], m: MesBase, i: number) => fluxoDoMes(lista, refs, m, i, hoje);
 
   // Sem plano: as parcelas como estão no contrato.
   const saldoSem: number[] = [];
