@@ -23,24 +23,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((message: string, type: ToastType = "success") => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }, []);
 
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      {/* No celular fica acima da barra de abas; no computador, canto de baixo. */}
+      <div
+        className="fixed z-[60] left-4 right-4 sm:left-auto sm:right-6 flex flex-col items-center sm:items-end gap-2 pointer-events-none bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-6"
+        role="status"
+        aria-live="polite"
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white pointer-events-auto animate-fade-in ${
-              t.type === "success" ? "bg-emerald-500" : "bg-red-500"
-            }`}
+            className="flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-xl shadow-lg text-sm font-medium bg-tinta-900 text-tinta-50 pointer-events-auto animate-fade-in"
           >
             {t.type === "success" ? (
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-marca-300" />
             ) : (
-              <XCircle className="w-4 h-4 flex-shrink-0" />
+              <XCircle className="w-4 h-4 flex-shrink-0 text-saida-300" />
             )}
             {t.message}
           </div>

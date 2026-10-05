@@ -5,73 +5,87 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  TrendingUp,
   LayoutDashboard,
-  DollarSign,
-  Coins,
-  MinusCircle,
+  CalendarCheck,
+  ArrowDownToLine,
+  Repeat,
   CreditCard,
-  BarChart3,
+  LineChart,
   LogOut,
-  Menu,
-  X,
   Landmark,
   Bell,
-  TrendingDown,
-  TrendingUp as TrendingUpIcon,
-  AlertCircle,
-  Mic,
   ScanLine,
+  Plus,
+  MoreHorizontal,
+  X,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useLancador } from "@/components/lancar/LancadorGlobal";
+import { Marca } from "@/components/ui/Marca";
 import type { Alerta } from "@/app/api/alertas/route";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/lancar", label: "Lançar por voz", icon: Mic },
-  { href: "/fatura", label: "Importar fatura", icon: ScanLine },
-  { href: "/receitas", label: "Receitas Fixas", icon: DollarSign },
-  { href: "/receitas-variaveis", label: "Receitas Variáveis", icon: Coins },
-  { href: "/despesas-fixas", label: "Despesas Fixas", icon: MinusCircle },
-  { href: "/despesas-variaveis", label: "Despesas Variáveis", icon: CreditCard },
-  { href: "/contas", label: "Contas Bancárias", icon: Landmark },
-  { href: "/projecao", label: "Projeção", icon: BarChart3 },
+const grupos = [
+  {
+    titulo: null,
+    itens: [
+      { href: "/dashboard", label: "Painel do mês", icon: LayoutDashboard },
+      { href: "/projecao", label: "Projeção", icon: LineChart },
+    ],
+  },
+  {
+    titulo: "Entradas",
+    itens: [
+      { href: "/receitas", label: "Receitas fixas", icon: CalendarCheck },
+      { href: "/receitas-variaveis", label: "Receitas parceladas", icon: ArrowDownToLine },
+    ],
+  },
+  {
+    titulo: "Saídas",
+    itens: [
+      { href: "/despesas-fixas", label: "Contas do mês", icon: Repeat },
+      { href: "/despesas-variaveis", label: "Cartões e parcelas", icon: CreditCard },
+    ],
+  },
+  {
+    titulo: "Ferramentas",
+    itens: [
+      { href: "/fatura", label: "Importar fatura", icon: ScanLine },
+      { href: "/contas", label: "Saldos das contas", icon: Landmark },
+    ],
+  },
 ];
 
-function diasLabel(dias: number): { label: string; color: string; bg: string } {
-  if (dias < 0) return { label: `${Math.abs(dias)}d atraso`, color: "text-red-700", bg: "bg-red-100" };
-  if (dias === 0) return { label: "Hoje", color: "text-orange-700", bg: "bg-orange-100" };
-  if (dias === 1) return { label: "Amanhã", color: "text-orange-600", bg: "bg-orange-50" };
-  return { label: `Em ${dias} dias`, color: "text-yellow-700", bg: "bg-yellow-100" };
+const abas = [
+  { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
+  { href: "/projecao", label: "Projeção", icon: LineChart },
+  { href: "/despesas-variaveis", label: "Cartões", icon: CreditCard },
+];
+
+function diasLabel(dias: number): { label: string; classe: string } {
+  if (dias < 0) return { label: `${Math.abs(dias)}d atrasado`, classe: "text-saida-700 bg-saida-50" };
+  if (dias === 0) return { label: "Hoje", classe: "text-aviso-800 bg-aviso-100" };
+  if (dias === 1) return { label: "Amanhã", classe: "text-aviso-700 bg-aviso-50" };
+  return { label: `Em ${dias} dias`, classe: "text-tinta-600 bg-tinta-100" };
 }
 
 function AlertaItem({ alerta }: { alerta: Alerta }) {
   const isReceita = alerta.tipo === "receita" || alerta.tipo === "receita_variavel";
-  const { label, color, bg } = diasLabel(alerta.diasAteVencimento);
+  const { label, classe } = diasLabel(alerta.diasAteVencimento);
 
   return (
-    <div className="px-4 py-3 border-b border-gray-50 last:border-0">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2 min-w-0">
-          <div className={`mt-0.5 flex-shrink-0 p-1 rounded-md ${isReceita ? "bg-emerald-50" : "bg-red-50"}`}>
-            {isReceita
-              ? <TrendingUpIcon className="w-3 h-3 text-emerald-600" />
-              : <TrendingDown className="w-3 h-3 text-red-500" />}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-800 truncate">{alerta.descricao}</p>
-            {alerta.extra && <p className="text-xs text-gray-400 truncate">{alerta.extra}</p>}
-            <p className="text-xs text-gray-500">{alerta.responsavel} · dia {alerta.diaVencimento}</p>
-          </div>
-        </div>
-        <div className="flex-shrink-0 text-right">
-          <p className={`text-xs font-bold ${isReceita ? "text-emerald-600" : "text-red-600"}`}>
-            {formatCurrency(alerta.valor)}
-          </p>
-          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${bg} ${color}`}>
-            {label}
-          </span>
-        </div>
+    <div className="px-4 py-3 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm text-tinta-900 truncate">{alerta.descricao}</p>
+        <p className="text-xs text-tinta-500 truncate">
+          {alerta.extra ? `${alerta.extra}, ` : ""}dia {alerta.diaVencimento}
+        </p>
+      </div>
+      <div className="flex-shrink-0 text-right">
+        <p className={cn("valor text-sm font-medium", isReceita ? "text-marca-700" : "text-tinta-900")}>
+          {isReceita ? "+" : "−"}
+          {formatCurrency(alerta.valor)}
+        </p>
+        <span className={cn("text-[11px] font-medium px-1.5 py-0.5 rounded-md", classe)}>{label}</span>
       </div>
     </div>
   );
@@ -79,133 +93,95 @@ function AlertaItem({ alerta }: { alerta: Alerta }) {
 
 export function Sidebar({ userName }: { userName: string }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const { abrir } = useLancador();
+  const [maisAberto, setMaisAberto] = useState(false);
   const [alertasOpen, setAlertasOpen] = useState(false);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
 
   useEffect(() => {
     fetch("/api/alertas")
-      .then((r) => r.ok ? r.json() : { alertas: [] })
+      .then((r) => (r.ok ? r.json() : { alertas: [] }))
       .then((d) => setAlertas(d.alertas ?? []));
-  }, []);
+  }, [pathname]);
+
+  useEffect(() => setMaisAberto(false), [pathname]);
 
   const urgentes = alertas.filter((a) => a.diasAteVencimento <= 0).length;
   const totalCount = alertas.length;
 
-  const NavLinks = () => (
-    <>
-      {navItems.map(({ href, label, icon: Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          onClick={() => setOpen(false)}
+  const Sino = ({ className }: { className?: string }) => (
+    <button
+      onClick={() => setAlertasOpen((v) => !v)}
+      aria-label={`Vencimentos próximos: ${totalCount}`}
+      className={cn("relative p-2 rounded-lg transition-colors", alertasOpen ? "bg-tinta-100" : "hover:bg-tinta-100", className)}
+    >
+      <Bell className="w-5 h-5 text-tinta-600" />
+      {totalCount > 0 && (
+        <span
           className={cn(
-            "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
-            pathname === href
-              ? "bg-emerald-100 text-emerald-700"
-              : "text-gray-600 hover:bg-gray-100"
+            "absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center",
+            urgentes > 0 ? "bg-saida-500" : "bg-aviso-500"
           )}
         >
-          <Icon className="w-5 h-5 flex-shrink-0" />
-          {label}
-        </Link>
+          {totalCount}
+        </span>
+      )}
+    </button>
+  );
+
+  const Navegacao = () => (
+    <nav className="flex-1 px-3 pb-3 overflow-y-auto">
+      {grupos.map((g) => (
+        <div key={g.titulo ?? "inicio"} className="mt-4 first:mt-1">
+          {g.titulo && <p className="px-3 mb-1 text-xs font-medium text-tinta-400">{g.titulo}</p>}
+          {g.itens.map(({ href, label, icon: Icon }) => {
+            const ativo = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={ativo ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] transition-colors",
+                  ativo ? "bg-superficie text-tinta-900 font-medium shadow-sm ring-1 ring-tinta-200" : "text-tinta-600 hover:text-tinta-900 hover:bg-tinta-100"
+                )}
+              >
+                <Icon className={cn("w-[18px] h-[18px] flex-shrink-0", ativo ? "text-marca-600" : "text-tinta-400")} />
+                {label}
+              </Link>
+            );
+          })}
+        </div>
       ))}
-    </>
+    </nav>
+  );
+
+  const Rodape = () => (
+    <div className="px-3 py-3 border-t border-tinta-200 flex items-center justify-between gap-2">
+      <span className="px-3 text-sm text-tinta-600 truncate">{userName}</span>
+      <button
+        onClick={() => signOut({ callbackUrl: "/login" })}
+        aria-label="Sair"
+        title="Sair"
+        className="p-2 rounded-lg text-tinta-500 hover:bg-saida-50 hover:text-saida-600 transition-colors"
+      >
+        <LogOut className="w-[18px] h-[18px]" />
+      </button>
+    </div>
   );
 
   return (
     <>
-      {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 flex flex-col">
-        <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2">
-            <div className="bg-emerald-500 text-white rounded-lg p-1.5">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <span className="font-bold text-gray-900">WiseFlow</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setAlertasOpen((v) => !v)}
-              className="relative p-2"
-            >
-              <Bell className="w-5 h-5 text-gray-600" />
-              {totalCount > 0 && (
-                <span className={`absolute top-1 right-1 w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${urgentes > 0 ? "bg-red-500" : "bg-orange-400"}`}>
-                  {totalCount}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setOpen(!open)} className="p-2">
-              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile overlay */}
-      {open && (
-        <div
-          className="lg:hidden fixed inset-0 z-20 bg-black/30"
-          onClick={() => setOpen(false)}
-        />
-      )}
-
-      {/* Alertas overlay (mobile) */}
-      {alertasOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setAlertasOpen(false)}>
-          <div
-            className="absolute top-14 left-0 right-0 bg-white border-b border-gray-200 shadow-xl max-h-[60vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <AlertasPanel alertas={alertas} onClose={() => setAlertasOpen(false)} />
-          </div>
-        </div>
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed left-0 top-0 z-20 h-full w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200",
-          "lg:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        )}
-      >
-        <div
-          className="flex items-center justify-between px-4 border-b border-gray-200 flex-shrink-0"
-          style={{ paddingTop: "env(safe-area-inset-top, 0px)", height: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="bg-emerald-500 text-white rounded-lg p-1.5">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <span className="font-bold text-gray-900">WiseFlow</span>
-          </div>
-
-          {/* Bell button (desktop) */}
-          <div className="relative hidden lg:block">
-            <button
-              onClick={() => setAlertasOpen((v) => !v)}
-              className={cn(
-                "p-1.5 rounded-lg transition-colors",
-                alertasOpen ? "bg-gray-100" : "hover:bg-gray-100"
-              )}
-              title="Alertas de vencimento"
-            >
-              <Bell className="w-4 h-4 text-gray-600" />
-              {totalCount > 0 && (
-                <span className={`absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${urgentes > 0 ? "bg-red-500" : "bg-orange-400"}`}>
-                  {totalCount}
-                </span>
-              )}
-            </button>
-
-            {/* Alertas dropdown (desktop) */}
+      {/* Computador: barra lateral */}
+      <aside className="hidden lg:flex fixed left-0 top-0 z-20 h-full w-64 bg-tinta-50 border-r border-tinta-200 flex-col">
+        <div className="flex items-center justify-between px-5 h-16 flex-shrink-0">
+          <Marca href="/dashboard" />
+          <div className="relative">
+            <Sino />
             {alertasOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setAlertasOpen(false)} />
-                <div className="absolute left-0 top-9 z-20 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                <div className="absolute left-0 top-11 z-20 w-80 bg-superficie rounded-2xl shadow-xl ring-1 ring-tinta-200 overflow-hidden animate-abre-modal origin-top-left">
                   <AlertasPanel alertas={alertas} onClose={() => setAlertasOpen(false)} />
                 </div>
               </>
@@ -213,22 +189,100 @@ export function Sidebar({ userName }: { userName: string }) {
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          <NavLinks />
-        </nav>
-
-        <div className="p-3 border-t border-gray-200">
-          <div className="px-4 py-2 text-xs text-gray-500 truncate mb-1">{userName}</div>
+        <div className="px-3 pb-2">
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+            onClick={abrir}
+            className="w-full flex items-center gap-2 pl-3 pr-2 py-2.5 rounded-xl bg-marca hover:bg-marca-forte text-white text-sm font-medium transition-colors"
           >
-            <LogOut className="w-5 h-5" />
-            Sair
+            <Plus className="w-[18px] h-[18px]" />
+            Lançar
+            <kbd className="ml-auto text-[11px] font-medium bg-white/15 rounded px-1.5 py-0.5">N</kbd>
           </button>
         </div>
+
+        <Navegacao />
+        <Rodape />
       </aside>
+
+      {/* Celular: barra de cima, só marca e vencimentos */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-tinta-50/90 backdrop-blur border-b border-tinta-200">
+        <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
+        <div className="flex items-center justify-between px-4 h-14">
+          <Marca href="/dashboard" />
+          <Sino />
+        </div>
+      </header>
+
+      {alertasOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/45 animate-fundo-in" onClick={() => setAlertasOpen(false)}>
+          <div
+            className="absolute left-2 right-2 bg-superficie rounded-2xl shadow-xl max-h-[70dvh] overflow-y-auto animate-abre-modal"
+            style={{ top: "calc(3.75rem + env(safe-area-inset-top, 0px))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <AlertasPanel alertas={alertas} onClose={() => setAlertasOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Celular: abas de baixo, com o Lançar no meio */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-superficie/95 backdrop-blur border-t border-tinta-200"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        <div className="grid grid-cols-5 items-end h-16">
+          {abas.slice(0, 2).map((a) => (
+            <Aba key={a.href} {...a} ativo={pathname === a.href} />
+          ))}
+          <div className="flex justify-center">
+            <button
+              onClick={abrir}
+              aria-label="Lançar"
+              className="-mt-5 w-14 h-14 rounded-2xl bg-marca text-white shadow-lg shadow-marca-700/25 flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <Plus className="w-7 h-7" />
+            </button>
+          </div>
+          <Aba {...abas[2]} ativo={pathname === abas[2].href} />
+          <button
+            onClick={() => setMaisAberto(true)}
+            className={cn("flex flex-col items-center justify-center gap-1 h-full text-[11px]", maisAberto ? "text-tinta-900" : "text-tinta-500")}
+          >
+            <MoreHorizontal className="w-5 h-5" />
+            Mais
+          </button>
+        </div>
+      </nav>
+
+      {maisAberto && (
+        <div className="lg:hidden fixed inset-0 z-40 flex items-end" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-black/45 animate-fundo-in" onClick={() => setMaisAberto(false)} />
+          <div className="relative w-full bg-tinta-50 rounded-t-3xl animate-sobe-folha flex flex-col max-h-[85dvh]" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+            <div className="flex items-center justify-between px-5 pt-4 pb-1">
+              <span className="text-lg font-semibold text-tinta-900">Menu</span>
+              <button onClick={() => setMaisAberto(false)} aria-label="Fechar" className="p-2 -mr-2 text-tinta-500 rounded-lg hover:bg-tinta-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <Navegacao />
+            <Rodape />
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+function Aba({ href, label, icon: Icon, ativo }: { href: string; label: string; icon: typeof LayoutDashboard; ativo: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={ativo ? "page" : undefined}
+      className={cn("flex flex-col items-center justify-center gap-1 h-full text-[11px]", ativo ? "text-marca-700 font-medium" : "text-tinta-500")}
+    >
+      <Icon className="w-5 h-5" />
+      {label}
+    </Link>
   );
 }
 
@@ -238,46 +292,35 @@ function AlertasPanel({ alertas, onClose }: { alertas: Alerta[]; onClose: () => 
 
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-orange-500" />
-          <span className="text-sm font-semibold text-gray-800">
-            Alertas de vencimento
-          </span>
-        </div>
-        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-          <X className="w-4 h-4 text-gray-400" />
+      <div className="flex items-center justify-between pl-4 pr-2 py-2.5 border-b border-tinta-100">
+        <span className="text-sm font-semibold text-tinta-900">Vencem nos próximos dias</span>
+        <button onClick={onClose} aria-label="Fechar" className="p-1.5 hover:bg-tinta-100 rounded-lg">
+          <X className="w-4 h-4 text-tinta-400" />
         </button>
       </div>
 
       {alertas.length === 0 ? (
-        <div className="px-4 py-6 text-center">
-          <p className="text-sm text-gray-400">Nenhum vencimento nos próximos 5 dias</p>
-        </div>
+        <p className="px-4 py-6 text-center text-sm text-tinta-500">Nada vence entre anteontem e daqui a 5 dias.</p>
       ) : (
         <div className="max-h-96 overflow-y-auto">
           {receitas.length > 0 && (
             <>
-              <p className="px-4 pt-2 pb-1 text-xs font-medium text-emerald-600 uppercase tracking-wide">
-                A receber
-              </p>
-              {receitas.map((a) => <AlertaItem key={a.id + a.tipo} alerta={a} />)}
+              <p className="px-4 pt-3 text-xs font-medium text-marca-700">A receber</p>
+              <div className="divide-y divide-tinta-100">
+                {receitas.map((a) => <AlertaItem key={a.id + a.tipo} alerta={a} />)}
+              </div>
             </>
           )}
           {despesas.length > 0 && (
             <>
-              <p className="px-4 pt-2 pb-1 text-xs font-medium text-red-500 uppercase tracking-wide">
-                A pagar
-              </p>
-              {despesas.map((a) => <AlertaItem key={a.id + a.tipo} alerta={a} />)}
+              <p className="px-4 pt-3 text-xs font-medium text-saida-600">A pagar</p>
+              <div className="divide-y divide-tinta-100">
+                {despesas.map((a) => <AlertaItem key={a.id + a.tipo} alerta={a} />)}
+              </div>
             </>
           )}
         </div>
       )}
-
-      <div className="px-4 py-2 border-t border-gray-50 text-xs text-gray-400 text-center">
-        Mostrando vencimentos de −2 a +5 dias a partir de hoje
-      </div>
     </>
   );
 }

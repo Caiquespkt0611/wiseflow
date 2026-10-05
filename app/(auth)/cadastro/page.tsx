@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { TrendingUp } from "lucide-react";
+import { Marca } from "@/components/ui/Marca";
 
 const schema = z.object({
   nome: z.string().min(2, "Nome deve ter ao menos 2 caracteres"),
@@ -45,86 +45,82 @@ export default function CadastroPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="bg-emerald-500 text-white rounded-xl p-2">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-          <span className="text-2xl font-bold text-gray-900">WiseFlow</span>
-        </div>
-
-        <h1 className="text-xl font-semibold text-gray-800 mb-6 text-center">
-          Criar sua conta
+    <div className="min-h-[100dvh] bg-tinta-50 flex flex-col px-5 py-8 sm:py-12">
+      <Marca />
+      <main className="flex-1 flex items-center">
+      <div className="w-full max-w-sm mx-auto">
+        <h1 className="text-[32px] leading-tight font-semibold tracking-tight text-tinta-900 mb-8">
+          Criar conta
         </h1>
 
         {error && (
-          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4">
+          <div className="bg-saida-50 text-saida-600 text-sm p-3 rounded-lg mb-4">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="campo-rotulo">
               Nome
             </label>
             <input
               {...register("nome")}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="campo"
               placeholder="Seu nome"
             />
             {errors.nome && (
-              <p className="text-red-500 text-xs mt-1">{errors.nome.message}</p>
+              <p className="text-saida-500 text-xs mt-1">{errors.nome.message}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="campo-rotulo">
               Email
             </label>
             <input
               {...register("email")}
               type="email"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="campo"
               placeholder="seu@email.com"
             />
             {errors.email && (
-              <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>
+              <p className="text-saida-500 text-xs mt-1">{errors.email.message}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="campo-rotulo">
               Senha
             </label>
             <input
               {...register("password")}
               type="password"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="campo"
               placeholder="Mínimo 6 caracteres"
             />
             {errors.password && (
-              <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>
+              <p className="text-saida-500 text-xs mt-1">{errors.password.message}</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
+            className="w-full bg-marca hover:bg-marca-forte disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors"
           >
             {loading ? "Criando conta..." : "Criar conta"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-sm text-tinta-500 mt-6">
           Já tem conta?{" "}
-          <Link href="/login" className="text-emerald-600 font-medium hover:underline">
-            Fazer login
+          <Link href="/login" className="text-marca-700 font-medium hover:underline underline-offset-4">
+            Entrar
           </Link>
         </p>
       </div>
+      </main>
     </div>
   );
 }

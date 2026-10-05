@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { format, addMonths, subMonths } from "date-fns";
+import Link from "next/link";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Landmark } from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { formatCurrency } from "@/lib/utils";
-import { CATEGORIA_COLORS_BY_RANK } from "@/lib/categories";
+import { cn, formatCurrency } from "@/lib/utils";
+import { useAoLancar } from "@/lib/eventos";
+import { MonthSelector } from "@/components/ui/MonthSelector";
 
 interface CategoriaItem {
   categoria: string;
@@ -28,9 +28,23 @@ interface DashboardData {
   cartaoVariaveis: CategoriaItem[];
 }
 
+interface MesProjecao {
+  mes: number;
+  ano: number;
+  previsaoAcumulada: number;
+}
+
+/** Junta fixas e cartão por categoria: a pergunta é para onde vai o dinheiro, não por qual canal. */
+function somarCategorias(...listas: CategoriaItem[][]) {
+  const mapa = new Map<string, number>();
+  for (const lista of listas) for (const c of lista) mapa.set(c.categoria, (mapa.get(c.categoria) ?? 0) + c.valor);
+  return Array.from(mapa, ([categoria, valor]) => ({ categoria, valor })).sort((a, b) => b.valor - a.valor);
+}
+
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [data, setData] = useState<DashboardData | null>(null);
+  const [proximos, setProximos] = useState<MesProjecao[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -42,128 +56,58 @@ export default function DashboardPage() {
     setLoading(false);
   }, [currentDate]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const fetchProximos = useCallback(async () => {
+    const res = await fetch("/api/projecao");
+    if (res.ok) setProximos(((await res.json()).projecao ?? []).slice(0, 6));
+  }, []);
 
-  const prevMonth = () => setCurrentDate((d) => subMonths(d, 1));
-  const nextMonth = () => setCurrentDate((d) => addMonths(d, 1));
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchProximos(); }, [fetchProximos]);
+  useAoLancar(fetchData);
+  useAoLancar(fetchProximos);
 
-  const mesLabel = format(currentDate, "MMMM yyyy", { locale: ptBR });
+  const mesNome = format(currentDate, "MMMM", { locale: ptBR });
+  const categorias = somarCategorias(data?.categoriasFixas ?? [], data?.categoriasVariaveis ?? []);
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={prevMonth}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="text-sm font-medium capitalize w-36 text-center">{mesLabel}</span>
-          <button
-            onClick={nextMonth}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6 lg:mb-8">
+        <div>
+          <h1 className="text-[26px] leading-tight font-semibold tracking-tight text-tinta-900">Painel do mês</h1>
+          <p className="mt-1 text-sm text-tinta-500">O que ainda falta entrar e sair até o fim de {mesNome}.</p>
         </div>
+        <MonthSelector date={currentDate} onChange={setCurrentDate} />
       </div>
 
-      {loading ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 h-32 animate-pulse bg-gray-100" />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl p-6 h-72 animate-pulse bg-gray-100" />
-            <div className="bg-white rounded-2xl p-6 h-72 animate-pulse bg-gray-100" />
+      {loading || !data ? (
+        <div className="space-y-4" aria-busy>
+          <div className="h-72 rounded-3xl bg-tinta-100 animate-pulse" />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="h-64 rounded-2xl bg-tinta-100 animate-pulse" />
+            <div className="h-64 rounded-2xl bg-tinta-100 animate-pulse" />
           </div>
         </div>
       ) : (
         <>
-          {/* Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              title={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"}
-              value={data?.saldoBancario ?? 0}
-              icon={<Landmark className="w-6 h-6" />}
-              color={(data?.saldoBancario ?? 0) >= 0 ? "teal" : "orange"}
-            />
-            <StatCard
-              title="Receitas Pendentes"
-              value={data?.totalReceitas ?? 0}
-              icon={<TrendingUp className="w-6 h-6" />}
-              color="emerald"
-            />
-            <StatCard
-              title="Despesas Pendentes"
-              value={data?.totalDespesas ?? 0}
-              icon={<TrendingDown className="w-6 h-6" />}
-              color="red"
-            />
-            <StatCard
-              title="Previsão Fim do Mês"
-              value={data?.previsao ?? 0}
-              icon={<Wallet className="w-6 h-6" />}
-              color={(data?.previsao ?? 0) >= 0 ? "blue" : "orange"}
-            />
-          </div>
+          <Conta data={data} mesNome={mesNome} />
 
-          {/* Donut Charts: fixas + variáveis */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <DonutCard
-              title="Despesas Fixas por Categoria"
-              data={data?.categoriasFixas ?? []}
-              total={data?.totalFixas ?? 0}
-            />
-            <DonutCard
-              title="Despesas Variáveis por Categoria"
-              data={data?.categoriasVariaveis ?? []}
-              total={data?.totalVariaveis ?? 0}
-            />
-          </div>
+          {proximos.length > 1 && <Proximos meses={proximos} />}
 
-          {/* Donut Chart: variáveis por cartão + Resumo lado a lado */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <DonutCard
-              title="Variáveis por Cartão de Crédito"
-              data={data?.cartaoVariaveis ?? []}
-              total={data?.totalVariaveis ?? 0}
+          <div className="grid gap-4 lg:grid-cols-2 mt-4">
+            <Barras
+              titulo="Para onde vai o dinheiro"
+              apoio="Contas do mês e parcelas, somadas por categoria"
+              itens={categorias}
+              total={data.totalDespesas}
+              vazio={`Nada a pagar em ${mesNome}.`}
             />
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-700 mb-4">Resumo do Mês</h3>
-              <div className="space-y-3">
-                <Row label={data?.isFuturo ? "Saldo Projetado" : "Saldo em Contas"} value={data?.saldoBancario ?? 0} positive />
-                <Row label="Receitas Fixas Pendentes" value={data?.totalReceitasFixas ?? 0} positive />
-                <Row label="Receitas Variáveis Pendentes" value={data?.totalReceitasVariaveis ?? 0} positive />
-                <Row label="Despesas Fixas Pendentes" value={-(data?.totalFixas ?? 0)} />
-                <Row label="Despesas Variáveis Pendentes" value={-(data?.totalVariaveis ?? 0)} />
-                <div className="border-t pt-3">
-                  <Row
-                    label="Previsão Fim do Mês"
-                    value={data?.previsao ?? 0}
-                    bold
-                    positive={(data?.previsao ?? 0) >= 0}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Breakdowns por categoria */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <BreakdownCard
-              title="Fixas por Categoria"
-              items={data?.categoriasFixas ?? []}
-            />
-            <BreakdownCard
-              title="Variáveis por Categoria"
-              items={data?.categoriasVariaveis ?? []}
+            <Barras
+              titulo="Por cartão"
+              apoio="Parcelas que caem neste mês"
+              itens={data.cartaoVariaveis}
+              total={data.totalVariaveis}
+              vazio={`Nenhuma parcela de cartão em ${mesNome}.`}
+              link={{ href: "/despesas-variaveis", texto: "Ver cartões" }}
             />
           </div>
         </>
@@ -172,159 +116,155 @@ export default function DashboardPage() {
   );
 }
 
-function BreakdownCard({ title, items }: { title: string; items: CategoriaItem[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">{title}</p>
-      <div className="space-y-2">
-        {items.slice(0, 8).map((c, i) => (
-          <div key={c.categoria} className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORIA_COLORS_BY_RANK[i] ?? CATEGORIA_COLORS_BY_RANK[CATEGORIA_COLORS_BY_RANK.length - 1] }} />
-              <span className="text-sm text-gray-600">{c.categoria}</span>
-            </div>
-            <span className="text-sm font-medium text-gray-800">{formatCurrency(c.valor)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DonutCard({ title, data, total }: { title: string; data: CategoriaItem[]; total: number }) {
-  if (data.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h3 className="font-semibold text-gray-700 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
-          Sem dados este mês
-        </div>
-      </div>
-    );
-  }
-
-  const chartData = data.map((d, i) => ({
-    ...d,
-    fill: CATEGORIA_COLORS_BY_RANK[i] ?? CATEGORIA_COLORS_BY_RANK[CATEGORIA_COLORS_BY_RANK.length - 1],
-    pct: total > 0 ? ((d.valor / total) * 100).toFixed(1) : "0",
-  }));
+/** A previsão com a conta que leva até ela, para dar para confiar no número. */
+function Conta({ data, mesNome }: { data: DashboardData; mesNome: string }) {
+  const sobra = data.previsao;
+  const linhas = [
+    {
+      sinal: "",
+      rotulo: data.isFuturo ? "Saldo projetado no início do mês" : "Saldo nas contas agora",
+      valor: data.saldoBancario,
+      detalhe: data.isFuturo ? "o que deve sobrar dos meses anteriores" : null,
+      href: "/contas",
+    },
+    {
+      sinal: "+",
+      rotulo: "Ainda vai entrar",
+      valor: data.totalReceitas,
+      detalhe: `${formatCurrency(data.totalReceitasFixas)} fixas e ${formatCurrency(data.totalReceitasVariaveis)} parceladas`,
+      href: "/receitas-variaveis",
+    },
+    {
+      sinal: "−",
+      rotulo: "Ainda vai sair",
+      valor: data.totalDespesas,
+      detalhe: `${formatCurrency(data.totalFixas)} em contas e ${formatCurrency(data.totalVariaveis)} em cartões`,
+      href: "/despesas-variaveis",
+    },
+  ];
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <h3 className="font-semibold text-gray-700 mb-4">{title}</h3>
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative w-36 h-36 flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={42}
-                outerRadius={66}
-                paddingAngle={2}
-                dataKey="valor"
-                startAngle={90}
-                endAngle={-270}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={index} fill={entry.fill} strokeWidth={0} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-xs text-gray-400">Total</span>
-            <span className="text-xs font-bold text-gray-800">{formatCurrency(total)}</span>
-          </div>
+    <section className="rounded-3xl bg-superficie ring-1 ring-tinta-200 overflow-hidden">
+      <div className="grid lg:grid-cols-[1.1fr_1fr]">
+        <div className="p-6 sm:p-8 flex flex-col justify-between gap-6 bg-marca-50/60 lg:border-r border-b lg:border-b-0 border-tinta-200">
+          <p className="text-sm text-tinta-600">Sobra prevista no fim de {mesNome}</p>
+          <p
+            className={cn(
+              "valor font-semibold tracking-tight leading-none text-[44px] sm:text-[56px] lg:text-[64px]",
+              sobra >= 0 ? "text-tinta-900" : "text-saida-600"
+            )}
+          >
+            {formatCurrency(sobra)}
+          </p>
+          <p className="text-sm text-tinta-500">
+            {sobra >= 0 ? "Se tudo entrar e sair como está lançado." : "Falta dinheiro para fechar o mês com o que está lançado."}
+          </p>
         </div>
-        <div className="w-full space-y-1.5">
-          {chartData.map((item, i) => (
-            <div key={item.categoria} className="flex items-center gap-2 min-w-0">
-              <div
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: item.fill }}
-              />
-              <span className="text-xs text-gray-600 flex-1 min-w-0 truncate">{item.categoria}</span>
-              <span className="text-xs font-semibold flex-shrink-0" style={{ color: CATEGORIA_COLORS_BY_RANK[i] ?? "#71717a" }}>
-                {item.pct}%
-              </span>
-              <span className="text-xs text-gray-500 flex-shrink-0 w-20 text-right">{formatCurrency(item.valor)}</span>
-            </div>
+
+        <dl className="p-2 sm:p-3">
+          {linhas.map((l) => (
+            <Link key={l.rotulo} href={l.href} className="group grid grid-cols-[1.25rem_1fr_auto] items-baseline gap-x-2 rounded-xl px-3 sm:px-4 py-3.5 hover:bg-tinta-50 transition-colors">
+              <span className="valor text-lg text-tinta-400" aria-hidden>{l.sinal}</span>
+              <dt className="text-[15px] text-tinta-800">
+                {l.rotulo}
+                {l.detalhe && <span className="block text-xs text-tinta-500 mt-0.5">{l.detalhe}</span>}
+              </dt>
+              <dd className={cn("valor text-lg font-medium", l.sinal === "−" ? "text-saida-600" : l.sinal === "+" ? "text-marca-700" : "text-tinta-900")}>
+                {formatCurrency(l.valor)}
+              </dd>
+            </Link>
           ))}
+          <div className="grid grid-cols-[1.25rem_1fr_auto] items-baseline gap-x-2 mx-3 sm:mx-4 mt-1 pt-3.5 pb-2 border-t border-tinta-200">
+            <span className="valor text-lg text-tinta-400" aria-hidden>=</span>
+            <dt className="text-[15px] font-medium text-tinta-900">Sobra prevista</dt>
+            <dd className={cn("valor text-lg font-semibold", sobra >= 0 ? "text-tinta-900" : "text-saida-600")}>{formatCurrency(sobra)}</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+/** Os próximos meses da projeção, para ver o rumo sem sair do painel. */
+function Proximos({ meses }: { meses: MesProjecao[] }) {
+  return (
+    <Link
+      href="/projecao"
+      className="mt-4 flex items-stretch overflow-x-auto rounded-2xl bg-superficie ring-1 ring-tinta-200 hover:ring-tinta-300 transition-shadow"
+      aria-label="Abrir a projeção"
+    >
+      {meses.map((m, i) => (
+        <div key={`${m.ano}-${m.mes}`} className={cn("flex-1 min-w-[112px] px-4 py-3", i > 0 && "border-l border-tinta-100")}>
+          <p className="text-xs text-tinta-500 capitalize">
+            {format(new Date(m.ano, m.mes - 1, 1), "MMM yy", { locale: ptBR }).replace(".", "")}
+          </p>
+          <p className={cn("valor text-sm font-medium mt-0.5", m.previsaoAcumulada >= 0 ? "text-tinta-900" : "text-saida-600")}>
+            {formatCurrency(m.previsaoAcumulada)}
+          </p>
         </div>
-      </div>
-    </div>
+      ))}
+    </Link>
   );
 }
 
-function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payload: { categoria: string; valor: number; pct: string }; fill: string }[] }) {
-  if (!active || !payload?.length) return null;
-  const { categoria, valor, pct } = payload[0].payload;
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-gray-800">{categoria}</p>
-      <p className="text-gray-600">{formatCurrency(valor)} <span className="text-gray-400">({pct}%)</span></p>
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  color,
+/** Barras horizontais de uma cor só: o que importa é o tamanho, e o rótulo fica em texto. */
+function Barras({
+  titulo,
+  apoio,
+  itens,
+  total,
+  vazio,
+  link,
 }: {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  color: string;
+  titulo: string;
+  apoio: string;
+  itens: CategoriaItem[];
+  total: number;
+  vazio: string;
+  link?: { href: string; texto: string };
 }) {
-  const colors: Record<string, string> = {
-    emerald: "bg-emerald-50 text-emerald-600",
-    red: "bg-red-50 text-red-600",
-    blue: "bg-blue-50 text-blue-600",
-    orange: "bg-orange-50 text-orange-600",
-    teal: "bg-teal-50 text-teal-600",
-  };
+  const maior = itens[0]?.valor ?? 0;
+  const visiveis = itens.slice(0, 7);
+  const resto = itens.slice(7).reduce((s, i) => s + i.valor, 0);
+  if (resto > 0) visiveis.push({ categoria: "Outras", valor: resto });
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-gray-500">{title}</span>
-        <div className={`p-2 rounded-xl ${colors[color]}`}>{icon}</div>
+    <section className="rounded-2xl bg-superficie ring-1 ring-tinta-200 p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-[15px] font-semibold text-tinta-900">{titulo}</h2>
+          <p className="text-xs text-tinta-500 mt-0.5">{apoio}</p>
+        </div>
+        {link && (
+          <Link href={link.href} className="text-sm text-marca-700 hover:underline underline-offset-4 flex-shrink-0">
+            {link.texto}
+          </Link>
+        )}
       </div>
-      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-all">{formatCurrency(value)}</p>
-    </div>
-  );
-}
 
-function Row({
-  label,
-  value,
-  positive,
-  bold,
-}: {
-  label: string;
-  value: number;
-  positive?: boolean;
-  bold?: boolean;
-}) {
-  const isPositive = positive ?? value >= 0;
-  return (
-    <div className="flex justify-between items-center">
-      <span className={`text-sm ${bold ? "font-semibold text-gray-800" : "text-gray-600"}`}>
-        {label}
-      </span>
-      <span
-        className={`text-sm font-medium ${bold ? "font-bold" : ""} ${
-          isPositive ? "text-emerald-600" : "text-red-600"
-        }`}
-      >
-        {formatCurrency(value)}
-      </span>
-    </div>
+      {visiveis.length === 0 ? (
+        <p className="py-10 text-center text-sm text-tinta-500">{vazio}</p>
+      ) : (
+        <ul className="space-y-3.5">
+          {visiveis.map((c) => {
+            const pct = total > 0 ? Math.round((c.valor / total) * 100) : 0;
+            return (
+              <li key={c.categoria} title={`${c.categoria}: ${formatCurrency(c.valor)} (${pct}%)`}>
+                <div className="flex items-baseline justify-between gap-3 text-sm mb-1.5">
+                  <span className="text-tinta-700 truncate">{c.categoria}</span>
+                  <span className="valor text-tinta-900 font-medium flex-shrink-0">
+                    {formatCurrency(c.valor)}
+                    <span className="text-tinta-400 font-normal ml-2 inline-block w-9 text-right">{pct}%</span>
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-tinta-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-tinta-700" style={{ width: `${maior > 0 ? Math.max(2, (c.valor / maior) * 100) : 0}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

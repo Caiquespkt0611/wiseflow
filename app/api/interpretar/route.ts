@@ -24,6 +24,9 @@ const entrada = z.object({
   fontes: z.array(z.string()).max(50).default([]),
   categorias: z.array(z.string()).max(60).default([]),
   responsaveis: z.array(z.string()).max(20).default([]),
+  // Data de hoje no aparelho de quem fala. O servidor roda em UTC: depois das 21h
+  // de Brasília ele já está no dia seguinte e o lançamento caía na data errada.
+  hoje: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 function instrucoes(dados: z.infer<typeof entrada>, hoje: string): string {
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const dados = entrada.parse(await req.json());
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = dados.hoje ?? new Date().toISOString().slice(0, 10);
     const client = new Anthropic();
 
     const resposta = await client.messages.parse({

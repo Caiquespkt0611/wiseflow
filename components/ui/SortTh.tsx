@@ -15,16 +15,16 @@ export function SortTh({ label, col, sort, onSort }: Props) {
   const active = sort?.key === col;
   return (
     <th
-      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer select-none group"
+      className="px-4 py-3 text-left text-xs font-medium text-tinta-500 cursor-pointer select-none group"
       onClick={() => onSort(col)}
     >
-      <span className="flex items-center gap-1 hover:text-gray-700 transition-colors">
+      <span className="flex items-center gap-1 hover:text-tinta-700 transition-colors">
         {label}
         {active ? (
           sort.dir === "asc" ? (
-            <ChevronUp className="w-3 h-3 text-emerald-600" />
+            <ChevronUp className="w-3 h-3 text-marca-600" />
           ) : (
-            <ChevronDown className="w-3 h-3 text-emerald-600" />
+            <ChevronDown className="w-3 h-3 text-marca-600" />
           )
         ) : (
           <ChevronsUpDown className="w-3 h-3 opacity-30 group-hover:opacity-60" />

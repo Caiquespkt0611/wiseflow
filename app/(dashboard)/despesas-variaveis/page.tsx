@@ -1,14 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2, Search, ChevronDown, ChevronRight as ChevronRightIcon, CreditCard, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, Search, ChevronDown, RotateCcw } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
 import { useToast } from "@/components/ui/Toast";
 import { DespesaVariavelForm, DespesaVariavelPayload } from "@/components/forms/DespesaVariavelForm";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { cn, confirmadaNoMes, formatCurrency, formatDate } from "@/lib/utils";
+import { Cabecalho } from "@/components/ui/Cabecalho";
+import { Linha, BotaoIcone, BotaoExcluir } from "@/components/ui/Linha";
+import { Vazio } from "@/components/ui/Vazio";
+import { useAoLancar } from "@/lib/eventos";
 
 interface DespesaVariavel {
   id: string;
@@ -57,6 +61,7 @@ export default function DespesasVariaveisPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useAoLancar(fetchData);
 
   // Unique card names from this user's data (for datalist suggestions)
   const cartoesExistentes = Array.from(new Set(items.map((i) => i.cartao).filter(Boolean))).sort();
@@ -80,11 +85,8 @@ export default function DespesasVariaveisPage() {
     return p >= 1 && p <= item.parcelasTotal;
   };
 
-  const isConfirmadaInMonth = (item: DespesaVariavel) => {
-    if (!item.confirmadaAte) return false;
-    const c = new Date(item.confirmadaAte);
-    return c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes;
-  };
+  const isConfirmadaInMonth = (item: DespesaVariavel) =>
+    confirmadaNoMes(item.dataInicio, item.confirmadaAte, mes, ano);
 
   const handleCreate = async (data: DespesaVariavelPayload) => {
     setSaving(true);
@@ -264,240 +266,182 @@ export default function DespesasVariaveisPage() {
   const isEmpty = allVisible.length === 0 && concluidas.length === 0;
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Despesas Variáveis</h1>
-          {!loading && (
-            <p className="text-sm text-gray-500 mt-1">
-              Pendente em {mesLabel}:{" "}
-              <span className="font-medium text-orange-600">{formatCurrency(totalPendente)}</span>
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <MonthSelector date={date} onChange={setDate} />
-          <button
-            onClick={() => setModal("create")}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Despesa
-          </button>
-        </div>
-      </div>
+    <div className="max-w-3xl mx-auto">
+      <Cabecalho
+        titulo="Cartões e parcelas"
+        subtitulo={
+          loading ? undefined : (
+            <>
+              Falta pagar em {mesLabel}: <span className="valor font-medium text-tinta-900">{formatCurrency(totalPendente)}</span>
+            </>
+          )
+        }
+      >
+        <MonthSelector date={date} onChange={setDate} />
+        <button
+          onClick={() => setModal("create")}
+          className="flex items-center gap-2 bg-marca hover:bg-marca-forte text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nova compra
+        </button>
+      </Cabecalho>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">Nenhuma despesa variável cadastrada</div>
-        ) : (
-          <>
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por descrição, cartão ou responsável..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
+      {loading ? (
+        <div className="space-y-3" aria-busy>
+          {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-2xl bg-tinta-100 animate-pulse" />)}
+        </div>
+      ) : items.length === 0 ? (
+        <Vazio texto="Nenhuma compra parcelada ainda." acao="Lançar a primeira" />
+      ) : (
+        <>
+          <div className="relative mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-tinta-400" />
+            <input
+              type="search"
+              placeholder="Buscar compra, cartão ou pessoa"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-superficie ring-1 ring-tinta-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-marca-500"
+            />
+          </div>
 
-            {isEmpty ? (
-              <div className="p-8 text-center text-gray-400 text-sm">
-                Nenhuma despesa variável em {mesLabel}
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {cardGroups.map((group) => {
-                  const expanded = expandedCards.has(group.cartao);
-                  const totalItens = group.pendentes.length + group.pagas.length;
-                  const isGroupLoading = loadingActionId === `group-${group.cartao}`;
-                  return (
-                    <div key={group.cartao}>
-                      {/* Card group header — div instead of button to allow nested button */}
-                      <div
-                        onClick={() => toggleCard(group.cartao)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex-shrink-0 w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center">
-                          <CreditCard className="w-3.5 h-3.5 text-orange-500" />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-800 flex-1">{group.cartao}</span>
-                        <span className="text-xs text-gray-400 mr-2">
-                          {totalItens} {totalItens === 1 ? "item" : "itens"}
-                        </span>
-                        {group.pagas.length > 0 && (
-                          <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full mr-2">
-                            {group.pagas.length} pago{group.pagas.length > 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {isCurrentMonth && group.pendentes.length > 0 && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleConfirmarTodos(group); }}
-                            disabled={loadingActionId !== null}
-                            title="Marcar todos como pagos"
-                            className="flex items-center gap-1 text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-2.5 py-1 rounded-lg transition-colors flex-shrink-0 mr-2"
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                            {isGroupLoading ? "Pagando..." : "Pagar tudo"}
-                          </button>
-                        )}
-                        <div className="flex flex-col items-end mr-2">
-                          <span className={`text-sm font-bold ${group.totalPendente > 0 ? "text-orange-600" : "text-gray-400"}`}>
-                            {formatCurrency(group.totalPendente)}<span className="text-xs font-normal">/mês</span>
-                          </span>
-                          {(cardRestanteMap.get(group.cartao) ?? 0) > 0 && (
-                            <span className="text-xs text-gray-400">
-                              {formatCurrency(cardRestanteMap.get(group.cartao) ?? 0)} total
-                            </span>
-                          )}
-                        </div>
-                        {expanded
-                          ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                          : <ChevronRightIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+          {isEmpty ? (
+            <p className="py-10 text-center text-sm text-tinta-500">Nenhuma parcela em {mesLabel}{filtro ? " com essa busca" : ""}.</p>
+          ) : (
+            <div className="space-y-3">
+              {cardGroups.map((group) => {
+                const expanded = expandedCards.has(group.cartao) || Boolean(filtro);
+                const totalItens = group.pendentes.length + group.pagas.length;
+                const isGroupLoading = loadingActionId === `group-${group.cartao}`;
+                const restante = cardRestanteMap.get(group.cartao) ?? 0;
+                return (
+                  <section key={group.cartao} className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden">
+                    <button
+                      onClick={() => toggleCard(group.cartao)}
+                      aria-expanded={expanded}
+                      className="w-full flex items-center gap-3 px-4 sm:px-5 py-4 text-left hover:bg-tinta-50 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[15px] font-semibold text-tinta-900 truncate">{group.cartao}</p>
+                        <p className="text-xs text-tinta-500 mt-0.5">
+                          {totalItens} {totalItens === 1 ? "parcela" : "parcelas"} no mês
+                          {group.pagas.length > 0 && `, ${group.pagas.length} paga${group.pagas.length > 1 ? "s" : ""}`}
+                          {restante > 0 && `. Faltam ${formatCurrency(restante)} para quitar`}
+                        </p>
                       </div>
+                      <span className={cn("valor text-base font-semibold flex-shrink-0", group.totalPendente > 0 ? "text-tinta-900" : "text-tinta-400")}>
+                        {formatCurrency(group.totalPendente)}
+                      </span>
+                      <ChevronDown className={cn("w-4 h-4 text-tinta-400 flex-shrink-0 transition-transform duration-200", expanded && "rotate-180")} />
+                    </button>
 
-                      {/* Expanded items */}
-                      {expanded && (
-                        <div className="bg-gray-50/50">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b border-gray-100">
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide pl-14">Descrição</th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide">Responsável</th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide">Parcelas</th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide">Valor</th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide">Vencimento</th>
-                                <th className="px-4 py-2" />
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {group.pendentes.map(({ item, parcela }) => (
-                                <tr key={item.id} className="hover:bg-white transition-colors">
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900 pl-14">{item.descricao}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex flex-col gap-0.5">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-gray-900">{parcela}/{item.parcelasTotal}</span>
-                                        <div className="w-14 bg-gray-200 rounded-full h-1.5">
-                                          <div
-                                            className="bg-orange-400 rounded-full h-1.5"
-                                            style={{ width: `${(parcela / item.parcelasTotal) * 100}%` }}
-                                          />
-                                        </div>
-                                      </div>
-                                      <span className="text-xs text-gray-400">
-                                        até {format(getEndDate(item), "MMM/yy", { locale: ptBR })}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3 text-sm font-medium text-orange-600">{formatCurrency(item.valorParcela)}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-1">
-                                      {isCurrentMonth && (
-                                        <button
-                                          onClick={() => handleConfirmar(item)}
-                                          disabled={loadingActionId !== null}
-                                          title="Confirmar pagamento"
-                                          className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40"
-                                        >
-                                          <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                                        </button>
-                                      )}
-                                      <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                        <Pencil className="w-4 h-4 text-gray-500" />
-                                      </button>
-                                      <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                        <Trash2 className="w-4 h-4 text-red-400" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-
-                              {group.pagas.map(({ item, parcela }) => (
-                                <tr key={item.id} className="opacity-50">
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-700 line-through pl-14">{item.descricao}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-500">{item.responsavel}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-500">{parcela}/{item.parcelasTotal}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorParcela)}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-400">{formatDate(item.dataInicio)}</td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Pago</span>
-                                      <button
-                                        onClick={() => handleReverterVariavel(item)}
-                                        disabled={loadingActionId !== null}
-                                        title="Desfazer pagamento"
-                                        className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
-                                      >
-                                        <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
-                                      </button>
-                                      <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                        <Pencil className="w-4 h-4 text-gray-400" />
-                                      </button>
-                                      <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                        <Trash2 className="w-4 h-4 text-red-300" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                    {expanded && (
+                      <div className="border-t border-tinta-100">
+                        {isCurrentMonth && group.pendentes.length > 1 && (
+                          <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-2.5 bg-tinta-50">
+                            <span className="text-xs text-tinta-500">Pagou a fatura inteira?</span>
+                            <button
+                              onClick={() => handleConfirmarTodos(group)}
+                              disabled={loadingActionId !== null}
+                              className="flex items-center gap-1.5 text-sm font-medium text-marca-700 hover:bg-marca-50 px-2.5 py-1.5 rounded-lg disabled:opacity-40 transition-colors"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              {isGroupLoading ? "Marcando…" : `Marcar as ${group.pendentes.length} como pagas`}
+                            </button>
+                          </div>
+                        )}
+                        <div className="divide-y divide-tinta-100">
+                          {group.pendentes.map(({ item, parcela }) => (
+                            <Linha
+                              key={item.id}
+                              titulo={item.descricao}
+                              aoAbrir={() => openEdit(item)}
+                              detalhe={`${parcela} de ${item.parcelasTotal}, até ${format(getEndDate(item), "MMM/yy", { locale: ptBR })}, ${item.responsavel}, vence ${formatDate(item.dataInicio).slice(0, 5)}`}
+                              valor={formatCurrency(item.valorParcela)}
+                              acoes={
+                                <>
+                                  {isCurrentMonth && (
+                                    <BotaoIcone rotulo="Marcar como paga" onClick={() => handleConfirmar(item)} disabled={loadingActionId !== null}>
+                                      <CheckCircle2 className="w-[18px] h-[18px]" />
+                                    </BotaoIcone>
+                                  )}
+                                  <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                                    <Pencil className="w-4 h-4" />
+                                  </BotaoIcone>
+                                  <BotaoIcone rotulo="Excluir" perigo soComputador onClick={() => handleDelete(item.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                  </BotaoIcone>
+                                </>
+                              }
+                            />
+                          ))}
+                          {group.pagas.map(({ item, parcela }) => (
+                            <Linha
+                              key={item.id}
+                              apagada
+                              titulo={item.descricao}
+                              aoAbrir={() => openEdit(item)}
+                              detalhe={`Paga, ${parcela} de ${item.parcelasTotal}, ${item.responsavel}`}
+                              valor={formatCurrency(item.valorParcela)}
+                              acoes={
+                                <>
+                                  <BotaoIcone rotulo="Desfazer pagamento" onClick={() => handleReverterVariavel(item)} disabled={loadingActionId !== null}>
+                                    <RotateCcw className="w-4 h-4" />
+                                  </BotaoIcone>
+                                  <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                                    <Pencil className="w-4 h-4" />
+                                  </BotaoIcone>
+                                </>
+                              }
+                            />
+                          ))}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
 
-                {/* Concluídas */}
-                {concluidas.length > 0 && (
-                  <div>
-                    <div className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                      Concluídas
-                    </div>
-                    <table className="w-full">
-                      <tbody className="divide-y divide-gray-50">
-                        {concluidas.map((item) => (
-                          <tr key={item.id} className="opacity-40">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-700 line-through">{item.descricao}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{item.cartao}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{item.responsavel}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{item.parcelasTotal}/{item.parcelasTotal}</td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorParcela)}</td>
-                            <td className="px-4 py-3">
-                              <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                <Trash2 className="w-4 h-4 text-red-300" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {concluidas.length > 0 && (
+                <details className="group rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden">
+                  <summary className="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 cursor-pointer list-none hover:bg-tinta-50">
+                    <span className="text-sm text-tinta-600">Quitadas ({concluidas.length})</span>
+                    <ChevronDown className="w-4 h-4 text-tinta-400 transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <div className="divide-y divide-tinta-100 border-t border-tinta-100">
+                    {concluidas.map((item) => (
+                      <Linha
+                        key={item.id}
+                        apagada
+                        titulo={item.descricao}
+                        aoAbrir={() => openEdit(item)}
+                        detalhe={`${item.cartao}, ${item.parcelasTotal}x, ${item.responsavel}`}
+                        valor={formatCurrency(item.valorParcela)}
+                        acoes={
+                          <BotaoIcone rotulo="Excluir" perigo soComputador onClick={() => handleDelete(item.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </BotaoIcone>
+                        }
+                      />
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+                </details>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {modal === "create" && (
-        <Modal title="Nova Despesa Variável" onClose={() => setModal(null)}>
+        <Modal title="Nova compra parcelada" onClose={() => setModal(null)}>
           <DespesaVariavelForm onSubmit={handleCreate} loading={saving} cartoes={cartoesExistentes} />
         </Modal>
       )}
       {modal === "edit" && selected && (
-        <Modal title="Editar Despesa Variável" onClose={() => { setModal(null); setSelected(null); }}>
+        <Modal title="Editar compra parcelada" onClose={() => { setModal(null); setSelected(null); }}>
           <DespesaVariavelForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} cartoes={cartoesExistentes} />
+          <BotaoExcluir onClick={() => { handleDelete(selected.id); setModal(null); setSelected(null); }} />
         </Modal>
       )}
     </div>

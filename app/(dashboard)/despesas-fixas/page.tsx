@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, Search, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
@@ -9,7 +9,12 @@ import { MonthSelector } from "@/components/ui/MonthSelector";
 import { useToast } from "@/components/ui/Toast";
 import { DespesaFixaForm, DespesaFixaFormData } from "@/components/forms/DespesaFixaForm";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
+import { useAoLancar } from "@/lib/eventos";
+import { sortList, type SortState } from "@/components/ui/SortTh";
+import { Cabecalho } from "@/components/ui/Cabecalho";
+import { Linha, BotaoIcone, BotaoExcluir } from "@/components/ui/Linha";
+import { BarraBusca } from "@/components/ui/BarraBusca";
+import { Vazio } from "@/components/ui/Vazio";
 
 interface DespesaFixa {
   id: string;
@@ -48,6 +53,7 @@ export default function DespesasFixasPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useAoLancar(fetchData);
 
   const handleCreate = async (data: DespesaFixaFormData) => {
     setSaving(true);
@@ -176,158 +182,124 @@ export default function DespesasFixasPage() {
   const pagas = aplicarFiltro(ativas.filter((i) => isPagaInMonth(i)));
   const totalPendentes = pendentes.reduce((sum, i) => sum + i.valor, 0);
 
+  const diaVence = (item: DespesaFixa) => formatDate(item.dataInicio).slice(0, 2);
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Despesas Fixas</h1>
-          {!loading && (
-            <p className="text-sm text-gray-500 mt-1">
-              Pendente em {mesLabel}:{" "}
-              <span className="font-medium text-red-600">{formatCurrency(totalPendentes)}</span>
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <MonthSelector date={date} onChange={setDate} />
-          <button
-            onClick={() => setModal("create")}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Despesa Fixa
-          </button>
-        </div>
-      </div>
+    <div className="max-w-3xl mx-auto">
+      <Cabecalho
+        titulo="Contas do mês"
+        subtitulo={
+          loading ? undefined : (
+            <>
+              Falta pagar em {mesLabel}: <span className="valor font-medium text-tinta-900">{formatCurrency(totalPendentes)}</span>
+            </>
+          )
+        }
+      >
+        <MonthSelector date={date} onChange={setDate} />
+        <button
+          onClick={() => setModal("create")}
+          className="flex items-center gap-2 bg-marca hover:bg-marca-forte text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nova conta
+        </button>
+      </Cabecalho>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : items.filter((i) => i.ativa).length === 0 ? (
-          <div className="p-8 text-center text-gray-400">Nenhuma despesa fixa cadastrada</div>
-        ) : (
-          <>
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por descrição ou responsável..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
+      {loading ? (
+        <div className="space-y-3" aria-busy>
+          {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-2xl bg-tinta-100 animate-pulse" />)}
+        </div>
+      ) : items.filter((i) => i.ativa).length === 0 ? (
+        <Vazio texto="Nenhuma conta do mês ainda. Aluguel, luz, escola, academia." acao="Lançar a primeira" />
+      ) : (
+        <>
+          <BarraBusca
+            valor={filtro}
+            aoMudar={setFiltro}
+            placeholder="Buscar conta ou pessoa"
+            sort={sort}
+            aoOrdenar={setSort}
+            ordens={[
+              { rotulo: "Maior valor", key: "valor", dir: "desc" },
+              { rotulo: "Nome", key: "descricao", dir: "asc" },
+            ]}
+          />
 
-            {pendentes.length === 0 && pagas.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 text-sm">
-                Nenhuma despesa fixa em {mesLabel}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Início" col="dataInicio" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Valor/mês" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {pendentes.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-red-600">{formatCurrency(item.valor)}</td>
-                        <td className="px-4 py-3">
-                          {item.recorrente && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                              <RefreshCw className="w-3 h-3" /> Recorrente
-                            </span>
+          {pendentes.length === 0 && pagas.length === 0 ? (
+            <p className="py-10 text-center text-sm text-tinta-500">Nenhuma conta em {mesLabel}{filtro ? " com essa busca" : ""}.</p>
+          ) : (
+            <div className="space-y-3">
+              {pendentes.length > 0 && (
+                <section className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden divide-y divide-tinta-100">
+                  {pendentes.map((item) => (
+                    <Linha
+                      key={item.id}
+                      titulo={item.descricao}
+                      aoAbrir={() => openEdit(item)}
+                      detalhe={`Vence dia ${diaVence(item)}, ${item.responsavel}`}
+                      valor={formatCurrency(item.valor)}
+                      acoes={
+                        <>
+                          {isCurrentMonth && (
+                            <BotaoIcone rotulo="Marcar como paga" onClick={() => handleConfirmar(item)} disabled={loadingActionId === item.id}>
+                              <CheckCircle2 className="w-[18px] h-[18px]" />
+                            </BotaoIcone>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            {isCurrentMonth && (
-                              <button
-                                onClick={() => handleConfirmar(item)}
-                                disabled={loadingActionId === item.id}
-                                title="Confirmar pagamento"
-                                className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40"
-                              >
-                                <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                              </button>
-                            )}
-                            <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                              <Pencil className="w-4 h-4 text-gray-500" />
-                            </button>
-                            <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                              <Trash2 className="w-4 h-4 text-red-400" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                            <Pencil className="w-4 h-4" />
+                          </BotaoIcone>
+                          <BotaoIcone rotulo="Excluir" perigo soComputador onClick={() => handleDelete(item.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </BotaoIcone>
+                        </>
+                      }
+                    />
+                  ))}
+                </section>
+              )}
 
-                    {pagas.length > 0 && (
-                      <>
-                        <tr>
-                          <td colSpan={6} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                            Pagas em {mesLabel}
-                          </td>
-                        </tr>
-                        {pagas.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-400">{formatCurrency(item.valor)}</td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Paga</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleReverter(item)}
-                                  disabled={loadingActionId === item.id}
-                                  title="Desfazer pagamento"
-                                  className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
-                                >
-                                  <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
-                                </button>
-                                <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                  <Pencil className="w-4 h-4 text-gray-400" />
-                                </button>
-                                <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                  <Trash2 className="w-4 h-4 text-red-300" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              {pagas.length > 0 && (
+                <section>
+                  <h2 className="px-1 mb-2 text-xs font-medium text-tinta-500">Pagas em {mesLabel}</h2>
+                  <div className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden divide-y divide-tinta-100">
+                    {pagas.map((item) => (
+                      <Linha
+                        key={item.id}
+                        apagada
+                        titulo={item.descricao}
+                        aoAbrir={() => openEdit(item)}
+                        detalhe={`Paga, dia ${diaVence(item)}, ${item.responsavel}`}
+                        valor={formatCurrency(item.valor)}
+                        acoes={
+                          <>
+                            <BotaoIcone rotulo="Desfazer pagamento" onClick={() => handleReverter(item)} disabled={loadingActionId === item.id}>
+                              <RotateCcw className="w-4 h-4" />
+                            </BotaoIcone>
+                            <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                              <Pencil className="w-4 h-4" />
+                            </BotaoIcone>
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {modal === "create" && (
-        <Modal title="Nova Despesa Fixa" onClose={() => setModal(null)}>
+        <Modal title="Nova conta do mês" onClose={() => setModal(null)}>
           <DespesaFixaForm onSubmit={handleCreate} loading={saving} />
         </Modal>
       )}
       {modal === "edit" && selected && (
-        <Modal title="Editar Despesa Fixa" onClose={() => { setModal(null); setSelected(null); }}>
+        <Modal title="Editar conta do mês" onClose={() => { setModal(null); setSelected(null); }}>
           <DespesaFixaForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} />
+          <BotaoExcluir onClick={() => { handleDelete(selected.id); setModal(null); setSelected(null); }} />
         </Modal>
       )}
     </div>

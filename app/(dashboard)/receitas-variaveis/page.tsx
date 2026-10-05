@@ -1,15 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2, Search, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw, ChevronDown } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
 import { useToast } from "@/components/ui/Toast";
 import { ReceitaVariavelForm, ReceitaVariavelPayload } from "@/components/forms/ReceitaVariavelForm";
-import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { sortList, type SortState } from "@/components/ui/SortTh";
+import { confirmadaNoMes, formatCurrency, formatDate } from "@/lib/utils";
+import { Cabecalho } from "@/components/ui/Cabecalho";
+import { Linha, BotaoIcone, BotaoExcluir } from "@/components/ui/Linha";
+import { BarraBusca } from "@/components/ui/BarraBusca";
+import { Vazio } from "@/components/ui/Vazio";
+import { useAoLancar } from "@/lib/eventos";
 
 interface ReceitaVariavel {
   id: string;
@@ -51,6 +56,7 @@ export default function ReceitasVariaveisPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useAoLancar(fetchData);
 
   const getParcelaForMonth = (item: ReceitaVariavel) => {
     const inicio = new Date(item.dataInicio);
@@ -63,11 +69,8 @@ export default function ReceitasVariaveisPage() {
     return p >= 1 && p <= item.parcelasTotal;
   };
 
-  const isConfirmadaInMonth = (item: ReceitaVariavel) => {
-    if (!item.confirmadaAte) return false;
-    const c = new Date(item.confirmadaAte);
-    return c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes;
-  };
+  const isConfirmadaInMonth = (item: ReceitaVariavel) =>
+    confirmadaNoMes(item.dataInicio, item.confirmadaAte, mes, ano);
 
   const handleCreate = async (data: ReceitaVariavelPayload) => {
     setSaving(true);
@@ -187,186 +190,155 @@ export default function ReceitasVariaveisPage() {
   const totalMensal = pendentes.reduce((sum, i) => sum + i.valorParcela, 0);
   const isEmpty = pendentes.length === 0 && recebidas.length === 0;
 
+  const detalhe = (item: ReceitaVariavel, prefixo = "") => {
+    const parcela = Math.max(1, Math.min(getParcelaForMonth(item), item.parcelasTotal));
+    return `${prefixo}${parcela} de ${item.parcelasTotal}, ${item.fonte}, ${item.responsavel}, dia ${formatDate(item.dataInicio).slice(0, 5)}`;
+  };
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Receitas Variáveis</h1>
-          {!loading && (
-            <p className="text-sm text-gray-500 mt-1">
-              A receber em {mesLabel}:{" "}
-              <span className="font-medium text-emerald-600">{formatCurrency(totalMensal)}</span>
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <MonthSelector date={date} onChange={setDate} />
-          <button
-            onClick={() => setModal("create")}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Receita
-          </button>
-        </div>
-      </div>
+    <div className="max-w-3xl mx-auto">
+      <Cabecalho
+        titulo="Receitas parceladas"
+        subtitulo={
+          loading ? undefined : (
+            <>
+              Falta receber em {mesLabel}: <span className="valor font-medium text-marca-700">{formatCurrency(totalMensal)}</span>
+            </>
+          )
+        }
+      >
+        <MonthSelector date={date} onChange={setDate} />
+        <button
+          onClick={() => setModal("create")}
+          className="flex items-center gap-2 bg-marca hover:bg-marca-forte text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nova receita
+        </button>
+      </Cabecalho>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">Nenhuma receita variável cadastrada</div>
-        ) : (
-          <>
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por descrição, fonte ou responsável..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
+      {loading ? (
+        <div className="space-y-3" aria-busy>
+          {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-2xl bg-tinta-100 animate-pulse" />)}
+        </div>
+      ) : items.length === 0 ? (
+        <Vazio texto="Nenhuma receita parcelada ainda." acao="Lançar a primeira" />
+      ) : (
+        <>
+          <BarraBusca
+            valor={filtro}
+            aoMudar={setFiltro}
+            placeholder="Buscar receita, fonte ou pessoa"
+            sort={sort}
+            aoOrdenar={setSort}
+            ordens={[
+              { rotulo: "Próximas primeiro", key: "dataInicio", dir: "asc" },
+              { rotulo: "Maior valor", key: "valorParcela", dir: "desc" },
+              { rotulo: "Nome", key: "descricao", dir: "asc" },
+            ]}
+          />
+
+          {isEmpty && concluidas.length === 0 ? (
+            <p className="py-10 text-center text-sm text-tinta-500">Nada a receber em {mesLabel}{filtro ? " com essa busca" : ""}.</p>
+          ) : (
+            <div className="space-y-3">
+              {pendentes.length > 0 && (
+                <section className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden divide-y divide-tinta-100">
+                  {pendentes.map((item) => (
+                    <Linha
+                      key={item.id}
+                      titulo={item.descricao}
+                      aoAbrir={() => openEdit(item)}
+                      detalhe={detalhe(item)}
+                      valor={formatCurrency(item.valorParcela)}
+                      valorClasse="text-marca-700"
+                      acoes={
+                        <>
+                          {isCurrentMonth && (
+                            <BotaoIcone rotulo="Marcar como recebida" onClick={() => handleConfirmar(item)} disabled={loadingActionId === item.id}>
+                              <CheckCircle2 className="w-[18px] h-[18px]" />
+                            </BotaoIcone>
+                          )}
+                          <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                            <Pencil className="w-4 h-4" />
+                          </BotaoIcone>
+                          <BotaoIcone rotulo="Excluir" perigo soComputador onClick={() => handleDelete(item.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </BotaoIcone>
+                        </>
+                      }
+                    />
+                  ))}
+                </section>
+              )}
+
+              {recebidas.length > 0 && (
+                <section>
+                  <h2 className="px-1 mb-2 text-xs font-medium text-tinta-500">Recebidas em {mesLabel}</h2>
+                  <div className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden divide-y divide-tinta-100">
+                    {recebidas.map((item) => (
+                      <Linha
+                        key={item.id}
+                        apagada
+                        titulo={item.descricao}
+                        aoAbrir={() => openEdit(item)}
+                        detalhe={detalhe(item, "Recebida, ")}
+                        valor={formatCurrency(item.valorParcela)}
+                        acoes={
+                          <>
+                            <BotaoIcone rotulo="Desfazer recebimento" onClick={() => handleReverterReceitaVar(item)} disabled={loadingActionId === item.id}>
+                              <RotateCcw className="w-4 h-4" />
+                            </BotaoIcone>
+                            <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                              <Pencil className="w-4 h-4" />
+                            </BotaoIcone>
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {concluidas.length > 0 && (
+                <details className="group rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden">
+                  <summary className="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 cursor-pointer list-none hover:bg-tinta-50">
+                    <span className="text-sm text-tinta-600">Concluídas ({concluidas.length})</span>
+                    <ChevronDown className="w-4 h-4 text-tinta-400 transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <div className="divide-y divide-tinta-100 border-t border-tinta-100">
+                    {concluidas.map((item) => (
+                      <Linha
+                        key={item.id}
+                        apagada
+                        titulo={item.descricao}
+                        aoAbrir={() => openEdit(item)}
+                        detalhe={`${item.parcelasTotal}x, ${item.fonte}, ${item.responsavel}`}
+                        valor={formatCurrency(item.valorParcela)}
+                        acoes={
+                          <BotaoIcone rotulo="Excluir" perigo soComputador onClick={() => handleDelete(item.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </BotaoIcone>
+                        }
+                      />
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
-
-            {isEmpty && concluidas.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 text-sm">
-                Nenhuma receita variável em {mesLabel}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Fonte" col="fonte" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Parcelas</th>
-                      <SortTh label="Valor Parcela" col="valorParcela" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Próximo Recebimento" col="dataInicio" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {pendentes.map((item) => {
-                      const parcelaAtualCalc = Math.max(1, Math.min(getParcelaForMonth(item), item.parcelasTotal));
-                      return (
-                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.fonte}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-900">{parcelaAtualCalc}/{item.parcelasTotal}</span>
-                              <div className="w-16 bg-gray-100 rounded-full h-1.5">
-                                <div className="bg-emerald-400 rounded-full h-1.5" style={{ width: `${(parcelaAtualCalc / item.parcelasTotal) * 100}%` }} />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-emerald-600">{formatCurrency(item.valorParcela)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.dataInicio)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              {isCurrentMonth && (
-                                <button onClick={() => handleConfirmar(item)} disabled={loadingActionId === item.id} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40">
-                                  <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                                </button>
-                              )}
-                              <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                <Pencil className="w-4 h-4 text-gray-500" />
-                              </button>
-                              <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                <Trash2 className="w-4 h-4 text-red-400" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {recebidas.length > 0 && (
-                      <>
-                        <tr>
-                          <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                            Recebidas em {mesLabel}
-                          </td>
-                        </tr>
-                        {recebidas.map((item) => {
-                          const parcelaAtualCalc = Math.max(1, Math.min(getParcelaForMonth(item), item.parcelasTotal));
-                          return (
-                            <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{item.fonte}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-500">{parcelaAtualCalc}/{item.parcelasTotal}</td>
-                              <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorParcela)}</td>
-                              <td className="px-4 py-3 text-sm text-gray-400">{formatDate(item.dataInicio)}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleReverterReceitaVar(item)}
-                                    disabled={loadingActionId === item.id}
-                                    title="Desfazer recebimento"
-                                    className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
-                                  >
-                                    <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
-                                  </button>
-                                  <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                    <Pencil className="w-4 h-4 text-gray-400" />
-                                  </button>
-                                  <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                    <Trash2 className="w-4 h-4 text-red-300" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </>
-                    )}
-
-                    {concluidas.length > 0 && (
-                      <>
-                        <tr>
-                          <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                            Concluídas
-                          </td>
-                        </tr>
-                        {concluidas.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50 opacity-40">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-700 line-through">{item.descricao}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{item.fonte}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{item.responsavel}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{item.parcelasTotal}/{item.parcelasTotal}</td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{formatCurrency(item.valorParcela)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(item.dataInicio)}</td>
-                            <td className="px-4 py-3">
-                              <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                <Trash2 className="w-4 h-4 text-red-300" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </>
+      )}
 
       {modal === "create" && (
-        <Modal title="Nova Receita Variável" onClose={() => setModal(null)}>
+        <Modal title="Nova receita parcelada" onClose={() => setModal(null)}>
           <ReceitaVariavelForm onSubmit={handleCreate} loading={saving} />
         </Modal>
       )}
       {modal === "edit" && selected && (
-        <Modal title="Editar Receita Variável" onClose={() => { setModal(null); setSelected(null); }}>
+        <Modal title="Editar receita parcelada" onClose={() => { setModal(null); setSelected(null); }}>
           <ReceitaVariavelForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} />
+          <BotaoExcluir onClick={() => { handleDelete(selected.id); setModal(null); setSelected(null); }} />
         </Modal>
       )}
     </div>

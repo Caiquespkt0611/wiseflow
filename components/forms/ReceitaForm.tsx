@@ -101,7 +101,7 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
       <Field label="Tipo de recorrência" error={errors.recorrencia?.message}>
         <div className="flex gap-2">
           {(["unica", "recorrente", "parcelada"] as const).map((opt) => (
-            <label key={opt} className={`flex-1 flex items-center justify-center gap-1.5 border rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors ${recorrencia === opt ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-medium" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+            <label key={opt} className={`flex-1 flex items-center justify-center gap-1.5 border rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors ${recorrencia === opt ? "border-marca-500 bg-marca-50 text-marca-700 font-medium" : "border-tinta-200 text-tinta-600 hover:border-tinta-300"}`}>
               <input {...register("recorrencia")} type="radio" value={opt} className="sr-only" />
               {opt === "unica" ? "Única" : opt === "recorrente" ? "Recorrente" : "Parcelada"}
             </label>
@@ -110,8 +110,8 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
       </Field>
 
       {tipo === "Férias" && (
-        <div className="flex gap-2 items-start bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+        <div className="flex gap-2 items-start bg-aviso-50 border border-aviso-200 rounded-lg px-3 py-2.5 text-xs text-aviso-800">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-aviso-500" />
           <p>Ao salvar, o sistema pedirá confirmação e aplicará automaticamente as exceções nos meses de <strong>Salário</strong> e <strong>Adiantamento</strong> afetados pelas férias.</p>
         </div>
       )}
@@ -129,7 +129,7 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
       )}
 
       {defaultValues && (
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-tinta-700 cursor-pointer">
           <input {...register("ativa")} type="checkbox" className="rounded" />
           Ativa
         </label>
@@ -138,7 +138,7 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
+        className="w-full bg-marca hover:bg-marca-forte disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
       >
         {loading ? "Salvando..." : "Salvar"}
       </button>
@@ -149,12 +149,12 @@ export function ReceitaForm({ defaultValues, onSubmit, loading }: Props) {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="campo-rotulo">{label}</label>
       {children}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-saida-500 text-xs mt-1">{error}</p>}
     </div>
   );
 }
 
 const inputClass =
-  "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
+  "campo";

@@ -14,9 +14,9 @@ export function Campo({
 }) {
   return (
     <div>
-      <label className={cn("block text-xs font-medium mb-1", alerta ? "text-amber-600" : "text-gray-500")}>
+      <label className={cn("block text-sm font-medium mb-1.5", alerta ? "text-aviso-700" : "text-tinta-700")}>
         {rotulo}
-        {alerta && " · confere"}
+        {alerta && ", confere"}
       </label>
       {children}
     </div>
@@ -45,12 +45,12 @@ export function ListaEditavel({
           value={valor}
           onChange={(e) => aoMudar(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="campo flex-1"
         />
         {opcoes.length > 0 && (
           <button
             onClick={() => { setLivre(false); aoMudar(opcoes[0]); }}
-            className="px-2 text-xs text-gray-400 hover:text-gray-600"
+            className="px-2 text-xs text-tinta-400 hover:text-tinta-600"
           >
             lista
           </button>
@@ -64,14 +64,14 @@ export function ListaEditavel({
       <select
         value={conhecido ? valor : ""}
         onChange={(e) => aoMudar(e.target.value)}
-        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="campo flex-1"
       >
         {!conhecido && <option value="">{placeholder}</option>}
         {opcoes.map((o) => (
           <option key={o} value={o}>{o}</option>
         ))}
       </select>
-      <button onClick={() => setLivre(true)} className="px-2 text-xs text-gray-400 hover:text-gray-600">
+      <button onClick={() => setLivre(true)} className="px-2 text-xs text-tinta-400 hover:text-tinta-600">
         nova
       </button>
     </div>

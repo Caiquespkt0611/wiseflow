@@ -93,7 +93,7 @@ export function ReceitaVariavelForm({ defaultValues, onSubmit, loading }: Props)
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
+        className="w-full bg-marca hover:bg-marca-forte disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
       >
         {loading ? "Salvando..." : "Salvar"}
       </button>
@@ -104,12 +104,12 @@ export function ReceitaVariavelForm({ defaultValues, onSubmit, loading }: Props)
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="campo-rotulo">{label}</label>
       {children}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-saida-500 text-xs mt-1">{error}</p>}
     </div>
   );
 }
 
 const inputClass =
-  "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
+  "campo";

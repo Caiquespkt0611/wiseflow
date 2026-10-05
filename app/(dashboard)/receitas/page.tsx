@@ -1,15 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, RefreshCw, CheckCircle2, CalendarX, X, Search, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, CalendarX, X, RotateCcw } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Modal } from "@/components/ui/Modal";
 import { MonthSelector } from "@/components/ui/MonthSelector";
 import { useToast } from "@/components/ui/Toast";
 import { ReceitaForm, ReceitaPayload } from "@/components/forms/ReceitaForm";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { SortTh, nextSort, sortList, type SortState } from "@/components/ui/SortTh";
+import { confirmadaNoMes, formatCurrency, formatDate } from "@/lib/utils";
+import { useAoLancar } from "@/lib/eventos";
+import { sortList, type SortState } from "@/components/ui/SortTh";
+import { Cabecalho } from "@/components/ui/Cabecalho";
+import { Linha, BotaoIcone, BotaoExcluir } from "@/components/ui/Linha";
+import { BarraBusca } from "@/components/ui/BarraBusca";
+import { Vazio } from "@/components/ui/Vazio";
 
 interface Receita {
   id: string;
@@ -71,6 +76,7 @@ export default function ReceitasPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useAoLancar(fetchData);
 
   const isActiveInMonth = (item: Receita): boolean => {
     if (!item.ativa) return false;
@@ -90,8 +96,12 @@ export default function ReceitasPage() {
 
   const isRecebidaInMonth = (item: Receita): boolean => {
     if (!item.confirmadaAte) return false;
-    const c = new Date(item.confirmadaAte);
-    return c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes;
+    // A parcelada não avança a data ao receber; só nela o mês de confirmadaAte vale.
+    if (item.parcelada) {
+      const c = new Date(item.confirmadaAte);
+      return c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes;
+    }
+    return confirmadaNoMes(item.data, item.confirmadaAte, mes, ano);
   };
 
   const getParcelaAtualForMonth = (item: Receita): number => {
@@ -320,202 +330,190 @@ export default function ReceitasPage() {
 
   const isEmpty = pendentes.length === 0 && recebidas.length === 0;
 
+  const totalPendente = pendentes.reduce((sum, i) => sum + i.valor, 0);
+
+  const detalhe = (item: Receita) => {
+    const partes = [item.tipo, item.responsavel, `dia ${formatDate(item.data).slice(0, 2)}`];
+    if (item.recorrente) partes.unshift("Todo mês");
+    if (item.parcelada && item.mesesTotal) partes.unshift(`Mês ${getParcelaAtualForMonth(item)} de ${item.mesesTotal}`);
+    if (!item.recorrente && !item.parcelada) partes.unshift(`Só em ${formatDate(item.data).slice(0, 5)}`);
+    return partes.join(", ");
+  };
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Receitas Fixas</h1>
-        <div className="flex items-center gap-3 flex-wrap">
-          <MonthSelector date={date} onChange={setDate} />
-          <button
-            onClick={() => setModal("create")}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Receita Fixa
-          </button>
+    <div className="max-w-3xl mx-auto">
+      <Cabecalho
+        titulo="Receitas fixas"
+        subtitulo={
+          loading ? undefined : (
+            <>
+              Falta receber em {mesLabel}: <span className="valor font-medium text-marca-700">{formatCurrency(totalPendente)}</span>
+            </>
+          )
+        }
+      >
+        <MonthSelector date={date} onChange={setDate} />
+        <button
+          onClick={() => setModal("create")}
+          className="flex items-center gap-2 bg-marca hover:bg-marca-forte text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nova receita fixa
+        </button>
+      </Cabecalho>
+
+      {loading ? (
+        <div className="space-y-3" aria-busy>
+          {[1, 2].map((i) => <div key={i} className="h-16 rounded-2xl bg-tinta-100 animate-pulse" />)}
         </div>
-      </div>
+      ) : items.filter((i) => i.ativa).length === 0 ? (
+        <Vazio texto="Nenhuma receita fixa ainda. Salário, aluguel recebido, pensão." acao="Lançar a primeira" />
+      ) : (
+        <>
+          <BarraBusca
+            valor={filtro}
+            aoMudar={setFiltro}
+            placeholder="Buscar receita, tipo ou pessoa"
+            sort={sort}
+            aoOrdenar={setSort}
+            ordens={[
+              { rotulo: "Por data", key: "data", dir: "asc" },
+              { rotulo: "Maior valor", key: "valor", dir: "desc" },
+              { rotulo: "Nome", key: "descricao", dir: "asc" },
+            ]}
+          />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400">Carregando...</div>
-        ) : items.filter((i) => i.ativa).length === 0 ? (
-          <div className="p-8 text-center text-gray-400">Nenhuma receita cadastrada</div>
-        ) : (
-          <>
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por descrição, tipo ou responsável..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
-
-            {isEmpty ? (
-              <div className="p-8 text-center text-gray-400 text-sm">
-                Nenhuma receita fixa em {mesLabel}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <SortTh label="Descrição" col="descricao" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Tipo" col="tipo" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Responsável" col="responsavel" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Data" col="data" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <SortTh label="Valor" col="valor" sort={sort} onSort={(c) => setSort(nextSort(sort, c))} />
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {pendentes.map((item) => {
-                      const proximasExcecoes = getProximasExcecoes(item);
-                      return (
-                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.descricao}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.tipo}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.data)}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-emerald-600">{formatCurrency(item.valor)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1">
-                              {item.recorrente && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full w-fit">
-                                  <RefreshCw className="w-3 h-3" /> Recorrente
-                                </span>
-                              )}
-                              {item.parcelada && item.mesesTotal && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full w-fit">
-                                  Mês {getParcelaAtualForMonth(item)}/{item.mesesTotal}
-                                </span>
-                              )}
-                              {proximasExcecoes.map((exc) => {
-                                const [excAno, excMes] = exc.split("-");
-                                const label = format(new Date(Number(excAno), Number(excMes) - 1, 1), "MMM/yy", { locale: ptBR });
-                                return (
-                                  <span key={exc} className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full w-fit">
-                                    <CalendarX className="w-3 h-3" />
-                                    Pulado {label}
-                                    <button onClick={() => handleRemoverExcecao(item, exc)} className="ml-0.5 hover:text-orange-800" title="Desfazer">
-                                      <X className="w-2.5 h-2.5" />
-                                    </button>
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
+          {isEmpty ? (
+            <p className="py-10 text-center text-sm text-tinta-500">Nenhuma receita fixa em {mesLabel}{filtro ? " com essa busca" : ""}.</p>
+          ) : (
+            <div className="space-y-3">
+              {pendentes.length > 0 && (
+                <section className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden divide-y divide-tinta-100">
+                  {pendentes.map((item) => {
+                    const proximasExcecoes = getProximasExcecoes(item);
+                    return (
+                      <div key={item.id}>
+                        <Linha
+                          titulo={item.descricao}
+                          aoAbrir={() => openEdit(item)}
+                          detalhe={detalhe(item)}
+                          valor={formatCurrency(item.valor)}
+                          valorClasse="text-marca-700"
+                          acoes={
+                            <>
                               {isCurrentMonth && (
-                                <button onClick={() => handleReceber(item)} disabled={loadingActionId === item.id} title="Confirmar recebimento" className="p-1.5 hover:bg-emerald-50 rounded-lg group disabled:opacity-40">
-                                  <CheckCircle2 className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                                </button>
+                                <BotaoIcone rotulo="Marcar como recebida" onClick={() => handleReceber(item)} disabled={loadingActionId === item.id}>
+                                  <CheckCircle2 className="w-[18px] h-[18px]" />
+                                </BotaoIcone>
                               )}
                               {item.recorrente && isCurrentMonth && (
-                                <button onClick={() => { setSkipModal(item); setSkipMes(""); }} title="Pular mês" className="p-1.5 hover:bg-orange-50 rounded-lg group">
-                                  <CalendarX className="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" />
-                                </button>
+                                <BotaoIcone rotulo="Pular um mês" onClick={() => { setSkipModal(item); setSkipMes(""); }}>
+                                  <CalendarX className="w-4 h-4" />
+                                </BotaoIcone>
                               )}
-                              <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                <Pencil className="w-4 h-4 text-gray-500" />
-                              </button>
-                              <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                <Trash2 className="w-4 h-4 text-red-400" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                                <Pencil className="w-4 h-4" />
+                              </BotaoIcone>
+                              <BotaoIcone rotulo="Excluir" perigo soComputador onClick={() => handleDelete(item.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </BotaoIcone>
+                            </>
+                          }
+                        />
+                        {proximasExcecoes.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 px-4 sm:px-5 pb-3 -mt-1">
+                            {proximasExcecoes.map((exc) => {
+                              const [excAno, excMes] = exc.split("-");
+                              const label = format(new Date(Number(excAno), Number(excMes) - 1, 1), "MMM/yy", { locale: ptBR });
+                              return (
+                                <span key={exc} className="inline-flex items-center gap-1 text-xs bg-aviso-50 text-aviso-800 pl-2 pr-1 py-0.5 rounded-md">
+                                  Não entra em {label}
+                                  <button
+                                    onClick={() => handleRemoverExcecao(item, exc)}
+                                    aria-label={`Voltar a contar ${label}`}
+                                    title="Voltar a contar este mês"
+                                    className="p-0.5 rounded hover:bg-aviso-100"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+              )}
 
-                    {recebidas.length > 0 && (
-                      <>
-                        <tr>
-                          <td colSpan={7} className="px-4 py-2 text-xs font-medium text-gray-400 bg-gray-50 uppercase tracking-wide">
-                            Recebidas em {mesLabel}
-                          </td>
-                        </tr>
-                        {recebidas.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50 opacity-50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900 line-through">{item.descricao}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{item.tipo}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{item.responsavel}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.data)}</td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-400">{formatCurrency(item.valor)}</td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Recebida</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleReverterReceita(item)}
-                                  disabled={loadingActionId === item.id}
-                                  title="Desfazer recebimento"
-                                  className="p-1.5 hover:bg-orange-50 rounded-lg group disabled:opacity-40"
-                                >
-                                  <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-orange-400 transition-colors" />
-                                </button>
-                                <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                                  <Pencil className="w-4 h-4 text-gray-400" />
-                                </button>
-                                <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 rounded-lg">
-                                  <Trash2 className="w-4 h-4 text-red-300" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              {recebidas.length > 0 && (
+                <section>
+                  <h2 className="px-1 mb-2 text-xs font-medium text-tinta-500">Recebidas em {mesLabel}</h2>
+                  <div className="rounded-2xl bg-superficie ring-1 ring-tinta-200 overflow-hidden divide-y divide-tinta-100">
+                    {recebidas.map((item) => (
+                      <Linha
+                        key={item.id}
+                        apagada
+                        titulo={item.descricao}
+                        aoAbrir={() => openEdit(item)}
+                        detalhe={`Recebida, ${item.tipo}, ${item.responsavel}`}
+                        valor={formatCurrency(item.valor)}
+                        acoes={
+                          <>
+                            <BotaoIcone rotulo="Desfazer recebimento" onClick={() => handleReverterReceita(item)} disabled={loadingActionId === item.id}>
+                              <RotateCcw className="w-4 h-4" />
+                            </BotaoIcone>
+                            <BotaoIcone rotulo="Editar" soComputador onClick={() => openEdit(item)}>
+                              <Pencil className="w-4 h-4" />
+                            </BotaoIcone>
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {modal === "create" && (
-        <Modal title="Nova Receita Fixa" onClose={() => setModal(null)}>
+        <Modal title="Nova receita fixa" onClose={() => setModal(null)}>
           <ReceitaForm onSubmit={handleCreate} loading={saving} />
         </Modal>
       )}
       {modal === "edit" && selected && (
-        <Modal title="Editar Receita" onClose={() => { setModal(null); setSelected(null); }}>
+        <Modal title="Editar receita fixa" onClose={() => { setModal(null); setSelected(null); }}>
           <ReceitaForm defaultValues={defaultEditValues} onSubmit={handleEdit} loading={saving} />
+          <BotaoExcluir onClick={() => { handleDelete(selected.id); setModal(null); setSelected(null); }} />
         </Modal>
       )}
 
       {feriasConfirm && (
-        <Modal title="Confirmar registro de Férias" onClose={() => setFeriasConfirm(null)}>
+        <Modal title="Registrar férias" onClose={() => setFeriasConfirm(null)}>
           <div className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <div className="bg-aviso-50 border border-aviso-200 rounded-xl p-4 text-sm text-aviso-800">
               <p className="font-semibold mb-2">Atenção: impacto nas receitas recorrentes</p>
               <p>Ao confirmar, o sistema irá registrar as férias e <strong>suprimir automaticamente</strong> todos os vencimentos de Salário e Adiantamento que caírem dentro dos <strong>35 dias seguintes</strong> à data de início das férias.</p>
               <ul className="mt-2 space-y-1 list-disc pl-4">
                 <li>Ex: férias em 01/out → janela vai até 05/nov → suprime adiantamento (20/out) e salário (05/nov).</li>
                 <li>Se um vencimento cair antes do início das férias, o próximo mês é verificado.</li>
               </ul>
-              <p className="mt-2 text-xs text-amber-600">Você pode desfazer qualquer exceção manualmente na lista de receitas.</p>
+              <p className="mt-2 text-xs text-aviso-600">Você pode desfazer qualquer exceção manualmente na lista de receitas.</p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setFeriasConfirm(null)}
-                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 border border-tinta-300 text-tinta-700 text-sm font-medium py-2.5 rounded-lg hover:bg-tinta-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleFeriasConfirm}
                 disabled={saving}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+                className="flex-1 bg-marca hover:bg-marca-forte disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
                 {saving ? "Aplicando..." : "Confirmar e registrar férias"}
               </button>
@@ -527,29 +525,29 @@ export default function ReceitasPage() {
       {skipModal && (
         <Modal title="Pular mês" onClose={() => setSkipModal(null)}>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Selecione o mês que <strong>{skipModal.descricao}</strong> não será recebido:
+            <p className="text-sm text-tinta-600">
+              Em qual mês <strong>{skipModal.descricao}</strong> não vai entrar?
             </p>
             <input
               type="month"
               value={skipMes}
               onChange={(e) => setSkipMes(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full bg-superficie border border-tinta-200 rounded-lg px-3 py-2.5 text-sm text-tinta-900 focus:outline-none focus:ring-2 focus:ring-marca-500"
               min={format(new Date(), "yyyy-MM")}
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setSkipModal(null)}
-                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 border border-tinta-300 text-tinta-700 text-sm font-medium py-2 rounded-lg hover:bg-tinta-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handlePularMes}
                 disabled={!skipMes}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                className="flex-1 bg-marca hover:bg-marca-forte disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
-                Confirmar
+                Pular este mês
               </button>
             </div>
           </div>

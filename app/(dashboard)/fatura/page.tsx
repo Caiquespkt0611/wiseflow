@@ -6,6 +6,7 @@ import {
   CheckCircle2, PlusCircle, HelpCircle, Ban,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { Cabecalho } from "@/components/ui/Cabecalho";
 import { Campo, ListaEditavel } from "@/components/ui/CampoLista";
 import { cn, formatCurrency } from "@/lib/utils";
 import { rotuloMes, type Confianca, type ItemFatura, type DespesaNoMes } from "@/lib/fatura";
@@ -286,17 +287,14 @@ export default function FaturaPage() {
     .reduce((soma, n) => soma + n.valorParcela, 0);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-10">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Importar fatura</h1>
-        <p className="text-sm text-gray-500">
-          Suba o PDF ou o print, diga o cartão e o mês. Eu comparo com o que já está lançado
-          e só crio o que faltou.
-        </p>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <Cabecalho
+        titulo="Importar fatura"
+        subtitulo="Suba o PDF ou o print, diga o cartão e o mês. O que já está lançado só é conferido; o que faltou é criado."
+      />
 
       {/* Envio */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+      <div className="bg-superficie rounded-2xl ring-1 ring-tinta-200 p-5 space-y-4">
         <div className="grid sm:grid-cols-3 gap-3">
           <Campo rotulo="Cartão">
             <ListaEditavel
@@ -312,7 +310,7 @@ export default function FaturaPage() {
               type="month"
               value={mesRef}
               onChange={(e) => setMesRef(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="campo"
             />
           </Campo>
 
@@ -322,7 +320,7 @@ export default function FaturaPage() {
               value={total}
               onChange={(e) => setTotal(e.target.value)}
               placeholder="opcional, mas confere a leitura"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="campo"
             />
           </Campo>
         </div>
@@ -339,7 +337,7 @@ export default function FaturaPage() {
           />
           <label
             htmlFor="arquivos-fatura"
-            className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl px-4 py-6 text-sm text-gray-500 cursor-pointer hover:border-emerald-400 hover:text-emerald-600 transition-colors"
+            className="flex items-center justify-center gap-2 border-2 border-dashed border-tinta-200 rounded-xl px-4 py-6 text-sm text-tinta-500 cursor-pointer hover:border-marca-400 hover:text-marca-600 transition-colors"
           >
             <Upload className="w-4 h-4" />
             {arquivos.length === 0
@@ -350,15 +348,15 @@ export default function FaturaPage() {
           {arquivos.length > 0 && (
             <ul className="mt-2 space-y-1">
               {arquivos.map((a) => (
-                <li key={a.name} className="flex items-center gap-2 text-xs text-gray-500">
+                <li key={a.name} className="flex items-center gap-2 text-xs text-tinta-500">
                   <FileText className="w-3 h-3 flex-shrink-0" />
                   <span className="truncate">{a.name}</span>
-                  <span className="text-gray-300">{(a.size / 1024 / 1024).toFixed(1)} MB</span>
+                  <span className="text-tinta-300">{(a.size / 1024 / 1024).toFixed(1)} MB</span>
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-2 text-xs text-gray-400">
+          <p className="mt-2 text-xs text-tinta-400">
             Fatura comprida cabe em vários prints. Mande todos de uma vez, eu leio como uma fatura só.
           </p>
         </div>
@@ -366,7 +364,7 @@ export default function FaturaPage() {
         <button
           onClick={ler}
           disabled={lendo || arquivos.length === 0 || !cartao.trim()}
-          className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-40"
+          className="w-full flex items-center justify-center gap-2 bg-tinta-900 hover:bg-tinta-800 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-40"
         >
           {lendo ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
           {lendo ? "Lendo a fatura..." : "Ler a fatura"}
@@ -379,39 +377,39 @@ export default function FaturaPage() {
           <div
             className={cn(
               "rounded-2xl border p-5",
-              divergente ? "bg-amber-50 border-amber-200" : "bg-white border-gray-100 shadow-sm"
+              divergente ? "bg-aviso-50 border-aviso-200" : "bg-superficie border-tinta-100 shadow-sm"
             )}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-gray-500">
-                  {leitura.cartao} · {rotuloMes(leitura.mesRef)} · {leitura.itensLidos} linhas lidas
+                <p className="text-xs text-tinta-500">
+                  {leitura.cartao}, {rotuloMes(leitura.mesRef)}, {leitura.itensLidos} linhas lidas
                 </p>
-                <p className="text-xl font-bold text-gray-900 mt-1">
+                <p className="text-xl font-bold text-tinta-900 mt-1">
                   {formatCurrency(leitura.totalLido)}
                 </p>
                 {leitura.diferenca !== null && (
-                  <p className={cn("text-xs mt-1", divergente ? "text-amber-700" : "text-emerald-600")}>
+                  <p className={cn("text-xs mt-1", divergente ? "text-aviso-700" : "text-marca-600")}>
                     {divergente
                       ? `Difere em ${formatCurrency(Math.abs(leitura.diferenca))} do total da fatura. Faltou página ou algum valor saiu errado.`
                       : "Bate com o total da fatura."}
                   </p>
                 )}
                 {leitura.diferenca === null && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-tinta-400 mt-1">
                     Sem o total da fatura eu não tenho como saber se li tudo.
                   </p>
                 )}
               </div>
               <button onClick={limpar} className="p-1 hover:bg-white/60 rounded-lg flex-shrink-0">
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-tinta-400" />
               </button>
             </div>
 
             {leitura.avisos.length > 0 && (
               <ul className="mt-3 space-y-1">
                 {leitura.avisos.map((a, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-amber-800">
+                  <li key={i} className="flex items-start gap-2 text-xs text-aviso-800">
                     <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
                     {a}
                   </li>
@@ -422,9 +420,9 @@ export default function FaturaPage() {
 
           {/* Novos */}
           <Bloco
-            icone={<PlusCircle className="w-4 h-4 text-emerald-600" />}
+            icone={<PlusCircle className="w-4 h-4 text-marca-600" />}
             titulo="Novos"
-            resumo={`${novos.filter((n) => n.incluir).length} de ${novos.length} · ${formatCurrency(totalNovos)}`}
+            resumo={`${novos.filter((n) => n.incluir).length} de ${novos.length}, ${formatCurrency(totalNovos)}`}
             vazio="Nada novo nesta fatura. Tudo já estava lançado."
             temItens={novos.length > 0}
           >
@@ -434,7 +432,7 @@ export default function FaturaPage() {
                   key={i}
                   className={cn(
                     "rounded-xl border p-3 space-y-3",
-                    n.incluir ? "border-gray-200" : "border-gray-100 bg-gray-50 opacity-60"
+                    n.incluir ? "border-tinta-200" : "border-tinta-100 bg-tinta-50 opacity-60"
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -442,14 +440,14 @@ export default function FaturaPage() {
                       type="checkbox"
                       checked={n.incluir}
                       onChange={(e) => alterarNovo(i, "incluir", e.target.checked)}
-                      className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                      className="w-4 h-4 accent-marca-500 flex-shrink-0"
                     />
                     <input
                       value={n.descricao}
                       onChange={(e) => alterarNovo(i, "descricao", e.target.value)}
-                      className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="flex-1 min-w-0 px-2 py-1.5 border border-tinta-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-marca-500"
                     />
-                    <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
+                    <span className="text-sm font-semibold text-tinta-900 flex-shrink-0">
                       {formatCurrency(n.valorParcela)}
                     </span>
                   </div>
@@ -463,7 +461,7 @@ export default function FaturaPage() {
                           step="0.01"
                           value={n.valorParcela}
                           onChange={(e) => alterarNovo(i, "valorParcela", parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="campo"
                         />
                       </Campo>
                       <Campo rotulo="Parcela">
@@ -473,15 +471,15 @@ export default function FaturaPage() {
                             min={1}
                             value={n.parcelaAtual}
                             onChange={(e) => alterarNovo(i, "parcelaAtual", Math.max(1, parseInt(e.target.value || "1", 10)))}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="campo"
                           />
-                          <span className="text-gray-400 text-xs">de</span>
+                          <span className="text-tinta-400 text-xs">de</span>
                           <input
                             type="number"
                             min={1}
                             value={n.parcelasTotal}
                             onChange={(e) => alterarNovo(i, "parcelasTotal", Math.max(1, parseInt(e.target.value || "1", 10)))}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="campo"
                           />
                         </div>
                       </Campo>
@@ -489,7 +487,7 @@ export default function FaturaPage() {
                         <select
                           value={n.categoria}
                           onChange={(e) => alterarNovo(i, "categoria", e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="campo"
                         >
                           {(opcoes?.categorias ?? []).map((c) => (
                             <option key={c} value={c}>{c}</option>
@@ -505,7 +503,7 @@ export default function FaturaPage() {
                         />
                       </Campo>
                       {n.parcelasTotal > 1 && (
-                        <p className="col-span-2 sm:col-span-4 text-xs text-gray-500">
+                        <p className="col-span-2 sm:col-span-4 text-xs text-tinta-500">
                           Entra como {n.parcelasTotal}x de {formatCurrency(n.valorParcela)}, na{" "}
                           {n.parcelaAtual}ª parcela. Vai aparecer por mais{" "}
                           {Math.max(0, n.parcelasTotal - n.parcelaAtual)} mês(es).
@@ -520,7 +518,7 @@ export default function FaturaPage() {
 
           {/* Já tem */}
           <Bloco
-            icone={<CheckCircle2 className="w-4 h-4 text-gray-500" />}
+            icone={<CheckCircle2 className="w-4 h-4 text-tinta-500" />}
             titulo="Já estava lançado"
             resumo={`${marcados.filter(Boolean).length} de ${leitura.jaTem.length}`}
             vazio="Nenhum item da fatura casou com o que já estava lançado."
@@ -535,34 +533,34 @@ export default function FaturaPage() {
                     onChange={(e) =>
                       setMarcados((m) => m.map((v, j) => (j === i ? e.target.checked : v)))
                     }
-                    className="w-4 h-4 accent-emerald-500 mt-0.5 flex-shrink-0"
+                    className="w-4 h-4 accent-marca-500 mt-0.5 flex-shrink-0"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-gray-800 truncate">
+                    <p className="text-tinta-800 truncate">
                       {p.despesa.descricao}
-                      <span className="text-gray-400"> ← {p.item.descricao}</span>
+                      <span className="text-tinta-400"> ← {p.item.descricao}</span>
                     </p>
-                    <p className="text-xs text-gray-400">
-                      parcela {p.despesa.parcelaNoMes}/{p.despesa.parcelasTotal} ·{" "}
-                      <span className={cn(p.confianca === "baixa" && "text-amber-600")}>
+                    <p className="text-xs text-tinta-400">
+                      parcela {p.despesa.parcelaNoMes}/{p.despesa.parcelasTotal},{" "}
+                      <span className={cn(p.confianca === "baixa" && "text-aviso-600")}>
                         {ROTULO_CONFIANCA[p.confianca]}
                       </span>
                     </p>
                   </div>
-                  <span className="text-gray-900 font-medium flex-shrink-0">
+                  <span className="text-tinta-900 font-medium flex-shrink-0">
                     {formatCurrency(p.despesa.valorParcela)}
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-gray-400">
+            <p className="mt-3 text-xs text-tinta-400">
               Nada aqui é criado de novo. O visto só marca a despesa como conferida por esta fatura.
             </p>
           </Bloco>
 
           {/* Sumiu */}
           <Bloco
-            icone={<HelpCircle className="w-4 h-4 text-amber-600" />}
+            icone={<HelpCircle className="w-4 h-4 text-aviso-600" />}
             titulo="Estava previsto e não veio"
             resumo={`${leitura.sumiu.length}`}
             vazio="Tudo que estava previsto apareceu na fatura."
@@ -572,16 +570,16 @@ export default function FaturaPage() {
               {leitura.sumiu.map((d) => (
                 <li key={d.id} className="flex items-center justify-between text-sm gap-2">
                   <div className="min-w-0">
-                    <p className="text-gray-800 truncate">{d.descricao}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-tinta-800 truncate">{d.descricao}</p>
+                    <p className="text-xs text-tinta-400">
                       parcela {d.parcelaNoMes}/{d.parcelasTotal}
                     </p>
                   </div>
-                  <span className="text-gray-500 flex-shrink-0">{formatCurrency(d.valorParcela)}</span>
+                  <span className="text-tinta-500 flex-shrink-0">{formatCurrency(d.valorParcela)}</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-gray-400">
+            <p className="mt-3 text-xs text-tinta-400">
               Pode ser compra cancelada, estorno ou parcelamento que acabou. Eu não mexo em nada
               disso: resolva em Despesas Variáveis se for o caso.
             </p>
@@ -590,7 +588,7 @@ export default function FaturaPage() {
           {/* Ignorados */}
           {leitura.ignorados.length > 0 && (
             <Bloco
-              icone={<Ban className="w-4 h-4 text-gray-400" />}
+              icone={<Ban className="w-4 h-4 text-tinta-400" />}
               titulo="Fora da conta"
               resumo={`${leitura.ignorados.length}`}
               vazio=""
@@ -598,13 +596,13 @@ export default function FaturaPage() {
             >
               <ul className="space-y-1">
                 {leitura.ignorados.map((i, k) => (
-                  <li key={k} className="flex items-center justify-between text-xs text-gray-500 gap-2">
-                    <span className="truncate">{i.descricao} · {i.linha}</span>
+                  <li key={k} className="flex items-center justify-between text-xs text-tinta-500 gap-2">
+                    <span className="truncate">{i.descricao}, {i.linha}</span>
                     <span className="flex-shrink-0">{formatCurrency(i.valor)}</span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-xs text-gray-400">
+              <p className="mt-3 text-xs text-tinta-400">
                 Pagamento da fatura anterior e estorno não viram despesa, mas contam na soma que
                 confere com o total.
               </p>
@@ -618,8 +616,8 @@ export default function FaturaPage() {
               className={cn(
                 "w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-xl transition-colors shadow-lg disabled:opacity-40",
                 insistindo
-                  ? "bg-amber-500 hover:bg-amber-600 text-white"
-                  : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  ? "bg-aviso-500 hover:bg-aviso-600 text-white"
+                  : "bg-marca hover:bg-marca-forte text-white"
               )}
             >
               {salvando ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
@@ -633,22 +631,22 @@ export default function FaturaPage() {
 
       {/* Histórico */}
       {importacoes.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Faturas importadas</h2>
+        <div className="bg-superficie rounded-2xl ring-1 ring-tinta-200 p-5">
+          <h2 className="text-sm font-semibold text-tinta-900 mb-3">Faturas importadas</h2>
           <ul className="space-y-3">
             {importacoes.map((imp) => (
               <li key={imp.id} className="flex items-center justify-between gap-3 text-sm">
                 <div className="min-w-0">
-                  <p className="text-gray-800 truncate">
-                    {imp.cartao} · {rotuloMes(imp.mesRef)}
+                  <p className="text-tinta-800 truncate">
+                    {imp.cartao}, {rotuloMes(imp.mesRef)}
                   </p>
-                  <p className="text-xs text-gray-400">
-                    {formatCurrency(imp.totalLido)} · {imp.criadas} criada(s), {imp.conferidas} conferida(s)
+                  <p className="text-xs text-tinta-400">
+                    {formatCurrency(imp.totalLido)}, {imp.criadas} criada(s), {imp.conferidas} conferida(s)
                   </p>
                 </div>
                 <button
                   onClick={() => desfazer(imp.id)}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-600 flex-shrink-0"
+                  className="flex items-center gap-1 text-xs text-tinta-400 hover:text-saida-600 flex-shrink-0"
                 >
                   <Undo2 className="w-3 h-3" />
                   desfazer
@@ -678,15 +676,15 @@ function Bloco({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <div className="bg-superficie rounded-2xl ring-1 ring-tinta-200 p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
+        <h2 className="flex items-center gap-2 font-semibold text-tinta-900 text-sm">
           {icone}
           {titulo}
         </h2>
-        <span className="text-xs text-gray-400">{resumo}</span>
+        <span className="text-xs text-tinta-400">{resumo}</span>
       </div>
-      {temItens ? children : <p className="text-sm text-gray-400">{vazio}</p>}
+      {temItens ? children : <p className="text-sm text-tinta-400">{vazio}</p>}
     </div>
   );
 }

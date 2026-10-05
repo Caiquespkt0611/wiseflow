@@ -2,10 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Canais RGB, para o Tailwind aplicar opacidade (bg-tinta-900/40). */
 :root {
-  /* gray-50 — mesmo fundo do shell do app, evita flash branco no carregamento */
-  --background: #f9fafb;
-  --foreground: #171717;
+  --superficie: 255 255 255;
+
+  --tinta-50: 244 245 242;
+  --tinta-100: 236 238 234;
+  --tinta-200: 223 226 221;
+  --tinta-300: 201 206 199;
+  --tinta-400: 115 124 116;
+  --tinta-500: 95 104 97;
+  --tinta-600: 74 82 76;
+  --tinta-700: 54 61 56;
+  --tinta-800: 35 41 37;
+  --tinta-900: 22 27 24;
+
+  --marca-50: 238 245 241;
+  --marca-100: 214 233 222;
+  --marca-200: 169 209 186;
+  --marca-300: 116 178 144;
+  --marca-400: 63 143 104;
+  --marca-500: 31 122 82;
+  --marca-600: 23 102 63;
+  --marca-700: 17 81 47;
+  --marca-800: 12 61 35;
+  --marca-900: 8 42 24;
+  --marca-acao: 23 102 63;
+  --marca-acao-forte: 17 81 47;
+
+  --saida-50: 251 239 236;
+  --saida-100: 246 220 213;
+  --saida-200: 237 185 172;
+  --saida-300: 222 142 123;
+  --saida-400: 204 102 80;
+  --saida-500: 184 74 51;
+  --saida-600: 162 61 40;
+  --saida-700: 132 48 31;
+  --saida-800: 101 36 22;
+  --saida-900: 72 26 16;
+
+  --aviso-50: 252 244 228;
+  --aviso-100: 248 231 194;
+  --aviso-200: 240 208 138;
+  --aviso-300: 227 178 84;
+  --aviso-400: 210 154 46;
+  --aviso-500: 185 128 26;
+  --aviso-600: 151 101 18;
+  --aviso-700: 119 78 14;
+  --aviso-800: 90 59 11;
+  --aviso-900: 64 42 8;
+
+  --background: rgb(var(--tinta-50));
+  --foreground: rgb(var(--tinta-900));
+  color-scheme: light;
+}
+
+/* Escuro acompanha o celular. Os neutros invertem; as cores de texto clareiam. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --superficie: 24 29 26;
+
+    --tinta-50: 16 20 18;
+    --tinta-100: 30 36 32;
+    --tinta-200: 42 49 44;
+    --tinta-300: 58 66 61;
+    --tinta-400: 140 150 143;
+    --tinta-500: 160 169 162;
+    --tinta-600: 186 194 188;
+    --tinta-700: 207 214 209;
+    --tinta-800: 226 231 227;
+    --tinta-900: 238 242 239;
+
+    --marca-50: 20 38 28;
+    --marca-100: 26 51 37;
+    --marca-200: 34 72 51;
+    --marca-300: 52 104 75;
+    --marca-400: 88 168 126;
+    --marca-500: 108 190 147;
+    --marca-600: 125 205 162;
+    --marca-700: 150 218 181;
+    --marca-800: 182 230 203;
+    --marca-900: 210 241 223;
+    --marca-acao: 34 122 80;
+    --marca-acao-forte: 28 104 68;
+
+    --saida-50: 44 24 19;
+    --saida-100: 60 31 24;
+    --saida-200: 88 42 31;
+    --saida-300: 138 66 50;
+    --saida-400: 214 120 98;
+    --saida-500: 226 128 105;
+    --saida-600: 236 150 129;
+    --saida-700: 243 177 160;
+    --saida-800: 248 205 194;
+    --saida-900: 251 226 220;
+
+    --aviso-50: 42 33 16;
+    --aviso-100: 58 45 20;
+    --aviso-200: 84 65 28;
+    --aviso-300: 122 94 40;
+    --aviso-400: 217 166 70;
+    --aviso-500: 224 176 90;
+    --aviso-600: 232 194 122;
+    --aviso-700: 239 210 154;
+    --aviso-800: 245 226 188;
+    --aviso-900: 250 240 218;
+
+    color-scheme: dark;
+  }
 }
 
 html,
@@ -15,10 +119,41 @@ body {
   overflow-x: hidden;
   width: 100vw;
   max-width: 100vw;
-  /* Tipografia mais nítida — deixa o Inter (aplicado no layout) brilhar */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Valor em dinheiro: algarismos da mesma largura, a coluna alinha. */
+.valor {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--marca-500));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Campo de formulário único. 16px no celular para o iPhone não dar zoom ao tocar. */
+@layer components {
+  .campo {
+    @apply w-full bg-superficie border border-tinta-200 rounded-lg px-3 py-2.5 text-base sm:text-sm text-tinta-900 placeholder:text-tinta-400;
+    @apply focus:outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-500/20;
+  }
+  .campo-rotulo {
+    @apply block text-sm font-medium text-tinta-700 mb-1.5;
+  }
 }
 
 @layer utilities {
@@ -27,5 +162,9 @@ body {
   }
   .pt-mobile-content {
     padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 1rem);
+  }
+  /* Espaço para a barra de baixo do celular não cobrir o fim da página. */
+  .pb-mobile-content {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 }
