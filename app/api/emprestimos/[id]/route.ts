@@ -3,13 +3,14 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hojeUTC, parcelasEmAberto } from "@/lib/emprestimos";
+import { hojeUTC, parcelasEmAberto, amortizar } from "@/lib/emprestimos";
 
 /**
  * Ações sobre um empréstimo:
  *   pagar      a próxima parcela saiu da conta (como o "pago" das contas do mês)
  *   desfazer   volta o último "pagar"
  *   antecipar  as N últimas parcelas foram quitadas no banco
+ *   amortizar  pagou um valor e a parcela diminuiu (mesmo prazo)
  *   quitar     o contrato foi quitado inteiro hoje
  *   reabrir    desfaz uma quitação marcada por engano
  *   editar     corrige dados do contrato (taxa, apelido, parcela...)
@@ -19,6 +20,7 @@ const schema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("desfazer") }),
   z.object({ acao: z.literal("antecipar"), parcelas: z.number().int().min(1) }),
   z.object({ acao: z.literal("desfazerAntecipacao"), parcelas: z.number().int().min(1) }),
+  z.object({ acao: z.literal("amortizar"), valor: z.number().positive() }),
   z.object({ acao: z.literal("quitar") }),
   z.object({ acao: z.literal("reabrir") }),
   z.object({
@@ -64,6 +66,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       case "desfazerAntecipacao":
         data = { parcelasAntecipadas: Math.max(0, e.parcelasAntecipadas - body.parcelas) };
         break;
+      case "amortizar": {
+        const r = amortizar(e, body.valor, hoje);
+        const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const nota = r.quitou
+          ? `Quitado com amortização de ${brl(body.valor)} em ${hoje.toISOString().slice(0, 10)}.`
+          : `Amortizado ${brl(body.valor)} em ${hoje.toISOString().slice(0, 10)}: parcela de ${brl(r.parcelaAntes)} para ${brl(r.parcelaDepois)}.`;
+        data = r.quitou
+          ? { quitadoEm: hoje, observacao: [e.observacao, nota].filter(Boolean).join(" ") }
+          : {
+              valorParcela: r.emprestimo.valorParcela,
+              valoresParcelas: r.emprestimo.valoresParcelas,
+              observacao: [e.observacao, nota].filter(Boolean).join(" "),
+            };
+        break;
+      }
       case "quitar":
         data = { quitadoEm: hoje };
         break;

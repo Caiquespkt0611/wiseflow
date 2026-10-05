@@ -76,15 +76,13 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Sugestão de hoje, por empréstimo: quantas últimas parcelas antecipar
-  // (todas = quitar). A pessoa decide; a tela só pré-preenche se ela pedir.
+  // Sugestão de hoje, por empréstimo: quitar, ou amortizar um valor para a
+  // parcela diminuir. A pessoa decide; a tela só preenche se ela pedir.
   const hojeIso = hoje.toISOString().slice(0, 10);
-  const sugestoes: Record<string, number> = {};
+  const sugestoes: Record<string, { modo: "quitar" | "parcela"; valor: number }> = {};
   for (const a of plano.acoes) {
     if (a.data !== hojeIso) continue;
-    const e = emprestimos.find((x) => x.id === a.emprestimoId);
-    if (!e) continue;
-    sugestoes[a.emprestimoId] = (sugestoes[a.emprestimoId] ?? 0) + (a.tipo === "quitar" ? e.antecipaveis : a.parcelas);
+    sugestoes[a.emprestimoId] = a.tipo === "quitar" ? { modo: "quitar", valor: a.valor } : { modo: "parcela", valor: a.valor };
   }
 
   return NextResponse.json({

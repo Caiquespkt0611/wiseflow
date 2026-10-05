@@ -21,6 +21,8 @@ import { useToast } from "@/components/ui/Toast";
 import { Cabecalho } from "@/components/ui/Cabecalho";
 import {
   aplicarEscolha,
+  amortizar,
+  custoQuitar,
   custoAntecipar,
   abertasNaData,
   valorDaParcela,
@@ -49,7 +51,43 @@ interface Resposta {
   emprestimos: Emprestimo[];
   meses: MesBase[];
   mesesPlano: MesBase[];
-  sugestoes: Record<string, number>;
+  sugestoes: Record<string, { modo: "quitar" | "parcela"; valor: number }>;
+}
+
+type Modo = "parcela" | "prazo" | "quitar";
+interface Escolha {
+  modo: Modo;
+  qtd: number; // parcelas do fim, no modo prazo
+  valor: number; // reais, no modo parcela
+}
+
+const NADA: Escolha = { modo: "parcela", qtd: 0, valor: 0 };
+
+/** O que uma escolha faz com um empréstimo, pago hoje. */
+function efeito(e: Emprestimo, esc: Escolha, hoje: Date) {
+  const ks = abertasNaData(e, hoje);
+  const nominal = (qtd: number) => ks.slice(ks.length - qtd).reduce((s, k) => s + valorDaParcela(e, k), 0);
+  const parcelaAgora = ks.length ? valorDaParcela(e, ks[0]) : 0;
+  if (esc.modo === "quitar" && ks.length) {
+    return { depois: aplicarEscolha(e, ks.length, hoje), pago: custoQuitar(e, hoje), somem: nominal(ks.length), parcelaAgora, parcelaDepois: 0, novoFim: null as Date | null, quitou: true };
+  }
+  if (esc.modo === "prazo" && esc.qtd > 0) {
+    const qtd = Math.min(esc.qtd, ks.length);
+    return {
+      depois: aplicarEscolha(e, qtd, hoje),
+      pago: custoAntecipar(e, qtd, hoje),
+      somem: nominal(qtd),
+      parcelaAgora,
+      parcelaDepois: qtd >= ks.length ? 0 : parcelaAgora,
+      novoFim: qtd < ks.length ? vencimento(e, ks[ks.length - qtd - 1]) : null,
+      quitou: qtd >= ks.length,
+    };
+  }
+  if (esc.modo === "parcela" && esc.valor > 0) {
+    const r = amortizar(e, esc.valor, hoje);
+    return { depois: r.emprestimo, pago: r.pago, somem: r.eliminado, parcelaAgora, parcelaDepois: r.parcelaDepois, novoFim: null, quitou: r.quitou };
+  }
+  return { depois: e as EmprestimoBase, pago: 0, somem: 0, parcelaAgora, parcelaDepois: parcelaAgora, novoFim: null, quitou: false };
 }
 
 const COMO_PAGA = {
@@ -71,7 +109,7 @@ export default function QuitacaoPage() {
   const cores = useCoresGrafico();
   const { toast } = useToast();
   const [dados, setDados] = useState<Resposta | null>(null);
-  const [escolha, setEscolha] = useState<Record<string, number>>({});
+  const [escolha, setEscolha] = useState<Record<string, Escolha>>({});
   const [gravando, setGravando] = useState(false);
 
   const buscar = useCallback(async () => {
@@ -87,13 +125,10 @@ export default function QuitacaoPage() {
   // Tudo o que a tela mostra sai daqui, recalculado a cada clique.
   const conta = useMemo(() => {
     if (!dados) return null;
-    const qtd = (e: Emprestimo) => Math.min(escolha[e.id] ?? 0, e.antecipaveis);
-    const depois = dados.emprestimos.map((e) => aplicarEscolha(e, qtd(e), hoje));
-    const pagoHoje = dados.emprestimos.reduce((s, e) => s + custoAntecipar(e, qtd(e), hoje), 0);
-    const somem = dados.emprestimos.reduce((s, e) => {
-      const ks = abertasNaData(e, hoje);
-      return s + ks.slice(ks.length - qtd(e)).reduce((t, k) => t + valorDaParcela(e, k), 0);
-    }, 0);
+    const efeitos = dados.emprestimos.map((e) => efeito(e, escolha[e.id] ?? NADA, hoje));
+    const depois = efeitos.map((x) => x.depois);
+    const pagoHoje = efeitos.reduce((s, x) => s + x.pago, 0);
+    const somem = efeitos.reduce((s, x) => s + x.somem, 0);
     const base = { meses: dados.meses, saldoInicial: dados.saldoBancario, originais: dados.emprestimos, hoje };
     const sem = serieSaldo({ ...base, emprestimos: dados.emprestimos });
     const com = serieSaldo({ ...base, emprestimos: depois, pagoHoje });
@@ -110,23 +145,31 @@ export default function QuitacaoPage() {
     return { pagoHoje, economia: somem - pagoHoje, sem, com, menor, proximos };
   }, [dados, escolha, hoje]);
 
-  const registrar = async (e: Emprestimo, qtd: number) => {
-    const quitar = qtd >= e.antecipaveis;
-    const custo = custoAntecipar(e, qtd, hoje);
-    const texto = quitar
-      ? `Registrar que o ${e.apelido} foi quitado hoje, por cerca de ${formatCurrency(custo)}?`
-      : `Registrar que as ${qtd} últimas parcelas do ${e.apelido} foram antecipadas hoje, por cerca de ${formatCurrency(custo)}?`;
+  const registrar = async (e: Emprestimo, esc: Escolha) => {
+    const x = efeito(e, esc, hoje);
+    const corpo =
+      esc.modo === "quitar" || x.quitou
+        ? { acao: "quitar" }
+        : esc.modo === "prazo"
+          ? { acao: "antecipar", parcelas: Math.min(esc.qtd, e.antecipaveis) }
+          : { acao: "amortizar", valor: esc.valor };
+    const texto =
+      corpo.acao === "quitar"
+        ? `Registrar que o ${e.apelido} foi quitado hoje, por cerca de ${formatCurrency(x.pago)}?`
+        : corpo.acao === "antecipar"
+          ? `Registrar que as ${esc.qtd} últimas parcelas do ${e.apelido} foram antecipadas hoje, por cerca de ${formatCurrency(x.pago)}?`
+          : `Registrar que você amortizou ${formatCurrency(esc.valor)} no ${e.apelido} e a parcela caiu para cerca de ${formatCurrency(x.parcelaDepois)}?`;
     if (!confirm(texto)) return;
     setGravando(true);
     const res = await fetch(`/api/emprestimos/${e.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(quitar ? { acao: "quitar" } : { acao: "antecipar", parcelas: qtd }),
+      body: JSON.stringify(corpo),
     });
     setGravando(false);
     if (res.ok) {
-      toast(quitar ? `${e.apelido} quitado` : `${qtd} parcelas do ${e.apelido} antecipadas`);
-      setEscolha((x) => ({ ...x, [e.id]: 0 }));
+      toast(corpo.acao === "quitar" ? `${e.apelido} quitado` : `${e.apelido} atualizado`);
+      setEscolha((v) => ({ ...v, [e.id]: NADA }));
       buscar();
     } else toast("Não consegui gravar", "error");
   };
@@ -169,7 +212,13 @@ export default function QuitacaoPage() {
       >
         {temSugestao && (
           <button
-            onClick={() => setEscolha(dados.sugestoes)}
+            onClick={() =>
+              setEscolha(
+                Object.fromEntries(
+                  Object.entries(dados.sugestoes).map(([id, sg]) => [id, { modo: sg.modo, qtd: 0, valor: Math.round(sg.valor) }])
+                )
+              )
+            }
             className="px-3.5 py-2 rounded-lg bg-marca hover:bg-marca-forte text-white text-sm font-medium transition-colors"
           >
             Usar a sugestão
@@ -227,7 +276,7 @@ export default function QuitacaoPage() {
       <section className="mt-6">
         <h2 className="text-[15px] font-semibold text-tinta-900">Do juro mais caro para o mais barato</h2>
         <p className="text-xs text-tinta-500 mt-0.5 mb-4">
-          Antecipar as últimas parcelas é onde o desconto é maior. Antecipar todas é quitar, e aí a parcela some do mês.
+          Três jeitos de pagar antes: diminuir a parcela (o alívio vem já no mês seguinte), encurtar o prazo (a parcela fica igual e acaba antes) ou quitar.
         </p>
         <div className="grid gap-3">
           {ativos.map((e, i) => (
@@ -236,11 +285,11 @@ export default function QuitacaoPage() {
               e={e}
               hoje={hoje}
               maisCaro={i === 0}
-              qtd={Math.min(escolha[e.id] ?? 0, e.antecipaveis)}
+              esc={escolha[e.id] ?? NADA}
               sugestao={dados.sugestoes[e.id]}
               gravando={gravando}
-              onQtd={(q) => setEscolha((x) => ({ ...x, [e.id]: q }))}
-              onRegistrar={(q) => registrar(e, q)}
+              onEsc={(v) => setEscolha((x) => ({ ...x, [e.id]: v }))}
+              onRegistrar={(v) => registrar(e, v)}
               onPaguei={() => acao(e.id, { acao: "pagar" }, `Parcela do ${e.apelido} marcada como paga`)}
               onDesfazer={() => acao(e.id, { acao: "desfazer" }, "Pagamento desfeito")}
             />
@@ -327,7 +376,9 @@ export default function QuitacaoPage() {
               <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5">
                 <span className="text-sm text-tinta-800">
                   <span className="inline-block w-16 text-tinta-500 capitalize">{a.data <= dados.hoje.slice(0, 10) ? "Hoje" : mesAno(a.data)}</span>
-                  {a.tipo === "quitar" ? `Quitar o ${a.apelido}` : `Antecipar ${a.parcelas} parcelas do ${a.apelido}`}
+                  {a.tipo === "quitar"
+                    ? `Quitar o ${a.apelido}`
+                    : `Amortizar no ${a.apelido}: parcela de ${formatCurrency(a.parcelaAntes)} para ${formatCurrency(a.parcelaDepois)}`}
                 </span>
                 <span className="valor text-sm text-tinta-900">
                   {formatCurrency(a.valor)} <span className="text-xs text-marca-700">economiza {formatCurrency(a.economia)}</span>
@@ -384,14 +435,20 @@ function Numero({ rotulo, valor, antes, bom, ruim }: { rotulo: string; valor: st
   );
 }
 
+const MODOS: { modo: Modo; rotulo: string }[] = [
+  { modo: "parcela", rotulo: "Diminuir a parcela" },
+  { modo: "prazo", rotulo: "Encurtar o prazo" },
+  { modo: "quitar", rotulo: "Quitar" },
+];
+
 function Controle({
   e,
   hoje,
   maisCaro,
-  qtd,
+  esc,
   sugestao,
   gravando,
-  onQtd,
+  onEsc,
   onRegistrar,
   onPaguei,
   onDesfazer,
@@ -399,25 +456,25 @@ function Controle({
   e: Emprestimo;
   hoje: Date;
   maisCaro: boolean;
-  qtd: number;
-  sugestao?: number;
+  esc: Escolha;
+  sugestao?: { modo: "quitar" | "parcela"; valor: number };
   gravando: boolean;
-  onQtd: (q: number) => void;
-  onRegistrar: (q: number) => void;
+  onEsc: (v: Escolha) => void;
+  onRegistrar: (v: Escolha) => void;
   onPaguei: () => void;
   onDesfazer: () => void;
 }) {
   const max = e.antecipaveis;
-  const quitar = qtd > 0 && qtd >= max;
-  const custo = qtd > 0 ? custoAntecipar(e, qtd, hoje) : 0;
+  const saldo = custoQuitar(e, hoje);
+  const x = efeito(e, esc, hoje);
+  const ativo = x.pago > 0;
   const ks = abertasNaData(e, hoje);
-  const somem = ks.slice(ks.length - qtd).reduce((s, k) => s + valorDaParcela(e, k), 0);
-  const novoFim = qtd > 0 && !quitar ? vencimento(e, ks[ks.length - qtd - 1]) : null;
-  const sug = sugestao ? Math.min(sugestao, max) : 0;
-  const ajustar = (q: number) => onQtd(Math.max(0, Math.min(max, Math.round(q) || 0)));
+  const valorEm = (v: number) => Math.max(0, Math.min(Math.round(saldo), Math.round(v) || 0));
+  const qtdEm = (q: number) => Math.max(0, Math.min(max, Math.round(q) || 0));
+  const sugTexto = sugestao ? (sugestao.modo === "quitar" ? "quitar" : `amortizar ${formatCurrency(sugestao.valor)}`) : null;
 
   return (
-    <article className={cn("rounded-2xl bg-superficie ring-1 p-4 sm:p-5", qtd > 0 ? "ring-marca-300" : "ring-tinta-200")}>
+    <article className={cn("rounded-2xl bg-superficie ring-1 p-4 sm:p-5", ativo ? "ring-marca-300" : "ring-tinta-200")}>
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <h3 className="text-[17px] font-semibold text-tinta-900">
@@ -427,78 +484,121 @@ function Controle({
             </span>
           </h3>
           <p className="text-sm text-tinta-500 mt-0.5">
-            {formatCurrency(e.periodicidade === "anual" ? valorDaParcela(e, ks[0] ?? 1) : e.valorParcela)} {e.periodicidade === "anual" ? "por ano" : "por mês"} · faltam {e.abertas} ·
-            termina em {e.terminaEm ? mesAno(e.terminaEm) : "—"} · {COMO_PAGA[e.pagamento]}
+            {formatCurrency(x.parcelaAgora)} {e.periodicidade === "anual" ? "por ano" : "por mês"} · faltam {e.abertas} · termina em{" "}
+            {e.terminaEm ? mesAno(e.terminaEm) : "—"} · {COMO_PAGA[e.pagamento]} · quitar hoje: {formatCurrency(saldo)}
           </p>
         </div>
-        {sug > 0 && sug !== qtd && (
+        {sugestao && sugTexto && (
           <button
-            onClick={() => onQtd(sug)}
+            onClick={() => onEsc({ modo: sugestao.modo, qtd: 0, valor: Math.round(sugestao.valor) })}
             className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-marca-50 text-marca-800 ring-1 ring-marca-200 hover:bg-marca-100 transition-colors"
           >
-            Sugestão: {sug >= max ? "quitar" : `antecipar ${sug}`}
+            Sugestão: {sugTexto}
           </button>
         )}
       </header>
 
       {max > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-          <span className="text-sm text-tinta-700">Antecipar as últimas</span>
-          <div className="flex items-center rounded-lg ring-1 ring-tinta-200 bg-superficie">
-            <button onClick={() => ajustar(qtd - 1)} disabled={qtd === 0} aria-label="Uma parcela a menos" className="p-2 text-tinta-500 hover:text-tinta-900 disabled:opacity-30">
-              <Minus className="w-4 h-4" />
-            </button>
-            <input
-              value={qtd}
-              onChange={(ev) => ajustar(Number(ev.target.value))}
-              inputMode="numeric"
-              aria-label={`Parcelas do ${e.apelido} a antecipar`}
-              className="valor w-12 text-center text-base sm:text-sm font-semibold text-tinta-900 bg-transparent focus:outline-none"
-            />
-            <button onClick={() => ajustar(qtd + 1)} disabled={qtd >= max} aria-label="Uma parcela a mais" className="p-2 text-tinta-500 hover:text-tinta-900 disabled:opacity-30">
-              <Plus className="w-4 h-4" />
-            </button>
+        <>
+          <div role="tablist" className="mt-4 inline-flex rounded-lg bg-tinta-100 p-0.5">
+            {MODOS.map((m) => (
+              <button
+                key={m.modo}
+                role="tab"
+                aria-selected={esc.modo === m.modo}
+                onClick={() => onEsc({ ...esc, modo: m.modo })}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm transition-colors",
+                  esc.modo === m.modo ? "bg-superficie text-tinta-900 font-medium shadow-sm" : "text-tinta-600 hover:text-tinta-900"
+                )}
+              >
+                {m.rotulo}
+              </button>
+            ))}
           </div>
-          <span className="text-sm text-tinta-500">de {max} parcelas</span>
-          <button
-            onClick={() => onQtd(quitar ? 0 : max)}
-            className={cn(
-              "text-sm font-medium px-3 py-1.5 rounded-lg ring-1 transition-colors",
-              quitar ? "bg-marca text-white ring-marca" : "ring-tinta-200 text-tinta-800 hover:bg-tinta-100"
-            )}
-          >
-            Quitar tudo
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={max}
-            value={qtd}
-            onChange={(ev) => ajustar(Number(ev.target.value))}
-            aria-label={`Parcelas do ${e.apelido} a antecipar`}
-            className="w-full accent-[rgb(var(--marca-acao))]"
-          />
-        </div>
+
+          {esc.modo === "parcela" && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <label className="flex items-center gap-2 text-sm text-tinta-700">
+                Pagar
+                <span className="flex items-center rounded-lg ring-1 ring-tinta-200 bg-superficie pl-2.5">
+                  <span className="text-tinta-500 text-sm">R$</span>
+                  <input
+                    value={esc.valor || ""}
+                    onChange={(ev) => onEsc({ ...esc, valor: valorEm(Number(ev.target.value.replace(/\D/g, ""))) })}
+                    inputMode="numeric"
+                    placeholder="0"
+                    aria-label={`Valor para amortizar no ${e.apelido}`}
+                    className="valor w-24 px-2 py-1.5 text-base sm:text-sm font-semibold text-tinta-900 bg-transparent focus:outline-none"
+                  />
+                </span>
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={Math.round(saldo)}
+                step={100}
+                value={esc.valor}
+                onChange={(ev) => onEsc({ ...esc, valor: valorEm(Number(ev.target.value)) })}
+                aria-label={`Valor para amortizar no ${e.apelido}`}
+                className="w-full accent-[rgb(var(--marca-acao))]"
+              />
+            </div>
+          )}
+
+          {esc.modo === "prazo" && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-sm text-tinta-700">Antecipar as últimas</span>
+              <div className="flex items-center rounded-lg ring-1 ring-tinta-200 bg-superficie">
+                <button onClick={() => onEsc({ ...esc, qtd: qtdEm(esc.qtd - 1) })} disabled={esc.qtd === 0} aria-label="Uma parcela a menos" className="p-2 text-tinta-500 hover:text-tinta-900 disabled:opacity-30">
+                  <Minus className="w-4 h-4" />
+                </button>
+                <input
+                  value={esc.qtd}
+                  onChange={(ev) => onEsc({ ...esc, qtd: qtdEm(Number(ev.target.value)) })}
+                  inputMode="numeric"
+                  aria-label={`Parcelas do ${e.apelido} a antecipar`}
+                  className="valor w-12 text-center text-base sm:text-sm font-semibold text-tinta-900 bg-transparent focus:outline-none"
+                />
+                <button onClick={() => onEsc({ ...esc, qtd: qtdEm(esc.qtd + 1) })} disabled={esc.qtd >= max} aria-label="Uma parcela a mais" className="p-2 text-tinta-500 hover:text-tinta-900 disabled:opacity-30">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <span className="text-sm text-tinta-500">de {max} parcelas</span>
+              <input
+                type="range"
+                min={0}
+                max={max}
+                value={esc.qtd}
+                onChange={(ev) => onEsc({ ...esc, qtd: qtdEm(Number(ev.target.value)) })}
+                aria-label={`Parcelas do ${e.apelido} a antecipar`}
+                className="w-full accent-[rgb(var(--marca-acao))]"
+              />
+            </div>
+          )}
+        </>
       )}
 
-      {qtd > 0 && (
+      {ativo && (
         <div className="mt-3 rounded-xl bg-marca-50/60 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-tinta-800">
-            Paga <strong className="valor font-semibold">{formatCurrency(custo)}</strong> hoje no lugar de{" "}
-            <span className="valor">{formatCurrency(somem)}</span> ·{" "}
-            <span className="valor text-marca-700 font-medium">economiza {formatCurrency(somem - custo)}</span>
+            Paga <strong className="valor font-semibold">{formatCurrency(x.pago)}</strong> hoje no lugar de{" "}
+            <span className="valor">{formatCurrency(x.somem)}</span> ·{" "}
+            <span className="valor text-marca-700 font-medium">economiza {formatCurrency(x.somem - x.pago)}</span>
             <span className="block text-tinta-600 mt-0.5">
-              {quitar
+              {x.quitou
                 ? e.pagamento === "fgts"
                   ? "Quitado: o FGTS dos próximos anos fica livre."
                   : e.pagamento === "folha"
-                    ? `Quitado: o salário volta a vir ${formatCurrency(e.valorParcela)} maior.`
-                    : `Quitado: ${formatCurrency(e.valorParcela)} a menos saindo todo mês.`
-                : `A parcela continua igual, mas termina em ${novoFim ? mesAno(novoFim) : ""} em vez de ${e.terminaEm ? mesAno(e.terminaEm) : ""}.`}
+                    ? `Quitado: o salário volta a vir ${formatCurrency(x.parcelaAgora)} maior.`
+                    : `Quitado: ${formatCurrency(x.parcelaAgora)} a menos saindo todo mês.`
+                : esc.modo === "parcela"
+                  ? `A parcela cai de ${formatCurrency(x.parcelaAgora)} para ${formatCurrency(x.parcelaDepois)}: ${formatCurrency(x.parcelaAgora - x.parcelaDepois)} a menos por mês, até ${e.terminaEm ? mesAno(e.terminaEm) : ""}.`
+                  : `A parcela continua igual, mas termina em ${x.novoFim ? mesAno(x.novoFim) : ""} em vez de ${e.terminaEm ? mesAno(e.terminaEm) : ""}.`}
             </span>
           </p>
           <button
-            onClick={() => onRegistrar(qtd)}
+            onClick={() => onRegistrar(esc)}
             disabled={gravando}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-marca hover:bg-marca-forte text-white text-sm font-medium transition-colors disabled:opacity-50"
           >
@@ -506,6 +606,12 @@ function Controle({
           </button>
         </div>
       )}
+      {esc.modo === "parcela" && ativo && !x.quitou && (
+        <p className="mt-2 text-xs text-tinta-500">
+          No Bradesco: Empréstimos › Amortização de saldo devedor › digite o valor. Se o banco perguntar, escolha reduzir o valor da parcela.
+        </p>
+      )}
+      {ks.length === 0 && <p className="mt-3 text-sm text-tinta-500">Nenhuma parcela a vencer daqui para a frente.</p>}
 
       {e.pagamento === "conta" && e.proximoVencimento && (
         <footer className="mt-4 pt-3 border-t border-tinta-100 flex items-center justify-between gap-3 text-sm">

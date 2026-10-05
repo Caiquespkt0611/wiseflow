@@ -120,6 +120,34 @@ export function custoAntecipar(e: EmprestimoBase, qtd: number, data: Date, hoje 
 }
 
 /**
+ * Amortizar para diminuir a parcela: paga um valor e todas as parcelas em
+ * aberto caem na mesma proporção do saldo, mantendo o número de parcelas e a
+ * data final. É a "Amortização de saldo devedor" do Bradesco. Pelo valor
+ * presente dá o mesmo desconto que antecipar as últimas; a diferença é que o
+ * alívio vem já no mês seguinte, e não no fim do contrato.
+ */
+export function amortizar(e: EmprestimoBase, valor: number, data: Date, hoje = data) {
+  const ks = abertasNaData(e, data, hoje);
+  const saldo = custoQuitar(e, data, hoje);
+  const parcelaAntes = ks.length ? valorDaParcela(e, ks[0]) : 0;
+  const nominal = ks.reduce((s, k) => s + valorDaParcela(e, k), 0);
+  if (!ks.length || valor >= saldo - 0.01) {
+    return { emprestimo: { ...e, quitadoEm: data } as EmprestimoBase, pago: saldo, parcelaAntes, parcelaDepois: 0, eliminado: nominal, quitou: true };
+  }
+  const f = 1 - Math.max(0, valor) / saldo;
+  const abertas = new Set(ks);
+  const valoresParcelas = Array.from({ length: e.parcelasTotal }, (_, i) => valorDaParcela(e, i + 1) * (abertas.has(i + 1) ? f : 1));
+  return {
+    emprestimo: { ...e, valorParcela: e.valorParcela * f, valoresParcelas } as EmprestimoBase,
+    pago: valor,
+    parcelaAntes,
+    parcelaDepois: parcelaAntes * f,
+    eliminado: nominal * (1 - f),
+    quitou: false,
+  };
+}
+
+/**
  * O que o empréstimo cobra do caixa no mês. Só "conta" sai do caixa. Com
  * `atrasadas`, soma também parcela de mês anterior que ainda não foi marcada
  * como paga (igual às contas do mês, que ficam no mês atual até serem pagas).
@@ -170,15 +198,15 @@ export type Acao =
       liberaNoCaixa: boolean; // folha e conta liberam dinheiro; FGTS libera o FGTS
     }
   | {
-      tipo: "antecipar";
+      tipo: "amortizar"; // paga parte e a parcela diminui
       data: string;
       emprestimoId: string;
       apelido: string;
       valor: number;
-      parcelas: number;
+      parcelaAntes: number;
+      parcelaDepois: number;
       eliminado: number;
       economia: number;
-      terminaEm: string; // novo último vencimento
     };
 
 export interface LinhaPlano {
@@ -331,32 +359,26 @@ export function simularPlano(opts: {
         continue;
       }
 
-      // Antecipar: quantas das últimas cabem no dinheiro livre.
-      let qtd = 0;
-      let gasto = 0;
-      for (let x = ks.length - 1; x >= 0; x--) {
-        const vp = valorPresente(alvo, ks[x], dataAcao);
-        if (gasto + vp > livre) break;
-        gasto += vp;
-        qtd++;
-      }
-      if (qtd === 0 || gasto < minimoAcao) break;
-      const eliminado = ks.slice(ks.length - qtd).reduce((t, k) => t + valorDaParcela(alvo, k), 0);
-      alvo.parcelasAntecipadas += qtd;
+      // Não dá para quitar: amortiza o que sobra, e a parcela cai já no mês
+      // seguinte. Em centenas redondas, que é como se digita no banco.
+      const valor = Math.floor(livre / 100) * 100;
+      if (valor < minimoAcao) break;
+      const r = amortizar(alvo, valor, dataAcao, hoje);
+      Object.assign(alvo, r.emprestimo);
       acoes.push({
-        tipo: "antecipar",
+        tipo: "amortizar",
         data: iso(dataAcao),
         emprestimoId: alvo.id,
         apelido: alvo.apelido,
-        valor: gasto,
-        parcelas: qtd,
-        eliminado,
-        economia: eliminado - gasto,
-        terminaEm: iso(vencimento(alvo, ultimaParcela(alvo))),
+        valor,
+        parcelaAntes: r.parcelaAntes,
+        parcelaDepois: r.parcelaDepois,
+        eliminado: r.eliminado,
+        economia: r.eliminado - valor,
       });
-      livre -= gasto;
-      pagoNoMes += gasto;
-      break; // o que sobrou não paga nem mais uma parcela
+      livre -= valor;
+      pagoNoMes += valor;
+      break; // o dinheiro livre acabou
     }
 
     caixa += fluxo(estado, m, i) - pagoNoMes;
