@@ -32,14 +32,20 @@ export async function GET(req: NextRequest) {
     let ano = anoBase;
     while (mes > 12) { mes -= 12; ano += 1; }
 
-    const inicio = new Date(ano, mes - 1, 1);
-    const fim = new Date(ano, mes, 0, 23, 59, 59);
+    const inicio = new Date(Date.UTC(ano, mes - 1, 1));
+    const fim = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
 
     const mesKey = `${ano}-${String(mes).padStart(2, "0")}`;
 
     const totalReceitasFixas = receitas
       .filter((r) => {
         if (r.parcelada && r.mesesTotal) {
+          // A parcelada não avança a data ao receber; a recebida no mês sai por confirmadaAte,
+          // senão ela conta de novo em cima do saldo bancário que já a inclui.
+          if (r.confirmadaAte) {
+            const c = new Date(r.confirmadaAte);
+            if (c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes) return false;
+          }
           const dataInicio = new Date(r.data);
           const diffMeses =
             (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
@@ -68,12 +74,16 @@ export async function GET(req: NextRequest) {
 
     const totalReceitas = totalReceitasFixas + totalReceitasVar;
 
-    // Fixas: só conta se dataInicio já chegou neste mês E (dataProximoVencimento é null ou <= fim do mês)
+    // Fixas: só conta se dataInicio já chegou neste mês E o próximo vencimento não passou deste mês.
+    // Compara mês com mês em UTC, igual ao painel: comparar com "fim do mês" no fuso do servidor
+    // fazia a conta paga que volta em 1º do mês seguinte contar de novo neste mês.
     const totalFixas = despesasFixas
       .filter((d) => {
         const ini = new Date(d.dataInicio);
         if (ini.getUTCFullYear() > ano || (ini.getUTCFullYear() === ano && ini.getUTCMonth() + 1 > mes)) return false;
-        return !d.dataProximoVencimento || new Date(d.dataProximoVencimento) <= fim;
+        if (!d.dataProximoVencimento) return true;
+        const prox = new Date(d.dataProximoVencimento);
+        return prox.getUTCFullYear() * 12 + prox.getUTCMonth() + 1 <= ano * 12 + mes;
       })
       .reduce((sum, d) => sum + d.valor, 0);
 

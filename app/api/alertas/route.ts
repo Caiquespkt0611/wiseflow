@@ -47,9 +47,14 @@ export async function GET() {
       if (diffMeses < 0 || diffMeses >= r.mesesTotal) continue;
     }
 
-    if (r.confirmadaAte) {
+    if (r.parcelada && r.confirmadaAte) {
       const c = new Date(r.confirmadaAte);
       if (c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes) continue;
+    }
+    // Recorrente recebida já teve a data levada para o mês seguinte.
+    if (!r.parcelada) {
+      const v = new Date(r.data);
+      if (v.getUTCFullYear() * 12 + v.getUTCMonth() + 1 > ano * 12 + mes) continue;
     }
 
     const diaVencimento = new Date(r.data).getUTCDate();
@@ -96,12 +101,8 @@ export async function GET() {
     const dataInicio = new Date(d.dataInicio);
     const diffMeses = (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
+    // Pagar avança dataInicio, então a parcela paga já cai fora pelo diffMeses.
     if (parcelaAtualCalc < d.parcelaAtual || parcelaAtualCalc > d.parcelasTotal) continue;
-
-    if (d.confirmadaAte) {
-      const c = new Date(d.confirmadaAte);
-      if (c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes) continue;
-    }
 
     const diaVencimento = dataInicio.getUTCDate();
     const diasAte = diaVencimento - today;
@@ -124,12 +125,8 @@ export async function GET() {
     const dataInicio = new Date(r.dataInicio);
     const diffMeses = (ano - dataInicio.getUTCFullYear()) * 12 + (mes - 1 - dataInicio.getUTCMonth());
     const parcelaAtualCalc = r.parcelaAtual + diffMeses;
+    // Receber avança dataInicio, então a parcela recebida já cai fora pelo diffMeses.
     if (parcelaAtualCalc < r.parcelaAtual || parcelaAtualCalc > r.parcelasTotal) continue;
-
-    if (r.confirmadaAte) {
-      const c = new Date(r.confirmadaAte);
-      if (c.getUTCFullYear() === ano && c.getUTCMonth() + 1 === mes) continue;
-    }
 
     const diaVencimento = dataInicio.getUTCDate();
     const diasAte = diaVencimento - today;

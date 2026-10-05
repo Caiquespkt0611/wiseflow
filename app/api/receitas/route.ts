@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
   let where: Record<string, unknown> = { userId: session.user.id };
 
   if (mes && ano) {
-    const inicio = new Date(Number(ano), Number(mes) - 1, 1);
-    const fim = new Date(Number(ano), Number(mes), 0, 23, 59, 59);
+    const inicio = new Date(Date.UTC(Number(ano), Number(mes) - 1, 1));
+    const fim = new Date(Date.UTC(Number(ano), Number(mes), 0, 23, 59, 59, 999));
     where = {
       ...where,
       OR: [

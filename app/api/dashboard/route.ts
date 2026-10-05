@@ -15,7 +15,9 @@ function calcReceitas(
   return receitas
     .filter((r) => {
       if (!r.ativa) return false;
-      if (excluirConfirmadas && r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return false;
+      // Só a parcelada não avança a data ao receber, então só nela confirmadaAte marca o mês.
+      // Recorrente e avulsa já saem do mês recebido porque a data foi para o mês seguinte.
+      if (excluirConfirmadas && r.parcelada && r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return false;
       if (r.parcelada && r.mesesTotal) {
         const diffMeses = (ano - r.data.getUTCFullYear()) * 12 + (mes - 1 - r.data.getUTCMonth());
         return diffMeses >= 0 && diffMeses < r.mesesTotal;
@@ -51,32 +53,29 @@ function calcFixas(
 }
 
 function calcVariaveis(
-  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date; confirmadaAte?: Date | null }[],
+  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date }[],
   mes: number,
-  ano: number,
-  excluirConfirmadas = true
+  ano: number
 ) {
   return variaveis.reduce((sum, d) => {
     const diffMeses =
       (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
+    // Pagar avança dataInicio e parcelaAtual, então a parcela paga já fica fora daqui.
     if (parcelaAtualCalc < d.parcelaAtual || parcelaAtualCalc > d.parcelasTotal) return sum;
-    if (excluirConfirmadas && d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
     return sum + d.valorParcela;
   }, 0);
 }
 
 function calcReceitasVar(
-  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date; confirmadaAte?: Date | null }[],
+  variaveis: { valorParcela: number; parcelaAtual: number; parcelasTotal: number; dataInicio: Date }[],
   mes: number,
-  ano: number,
-  excluirConfirmadas = true
+  ano: number
 ) {
   return variaveis.reduce((sum, r) => {
     const diffMeses = (ano - r.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - r.dataInicio.getUTCMonth());
     const parcelaAtualCalc = r.parcelaAtual + diffMeses;
     if (parcelaAtualCalc < r.parcelaAtual || parcelaAtualCalc > r.parcelasTotal) return sum;
-    if (excluirConfirmadas && r.confirmadaAte && r.confirmadaAte.getUTCFullYear() === ano && r.confirmadaAte.getUTCMonth() + 1 === mes) return sum;
     return sum + r.valorParcela;
   }, 0);
 }
@@ -104,8 +103,8 @@ export async function GET(req: NextRequest) {
   const anoAtual = now.getFullYear();
   const isFuturo = ano * 12 + mes > anoAtual * 12 + mesAtual;
 
-  const inicio = new Date(ano, mes - 1, 1);
-  const fim = new Date(ano, mes, 0, 23, 59, 59);
+  const inicio = new Date(Date.UTC(ano, mes - 1, 1));
+  const fim = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
 
   const [todasReceitas, todasFixas, todasVariaveis, todasReceitasVar, contasBancarias] = await Promise.all([
     prisma.receita.findMany({ where: { userId: session.user.id } }),
@@ -123,12 +122,12 @@ export async function GET(req: NextRequest) {
     let m = mesAtual;
     let a = anoAtual;
     while (a * 12 + m < ano * 12 + mes) {
-      const ini = new Date(a, m - 1, 1);
-      const fim_m = new Date(a, m, 0, 23, 59, 59);
+      const ini = new Date(Date.UTC(a, m - 1, 1));
+      const fim_m = new Date(Date.UTC(a, m, 0, 23, 59, 59, 999));
       const r = calcReceitas(todasReceitas.map(x => ({ ...x, data: new Date(x.data) })), ini, fim_m, m, a, false);
-      const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a, false);
+      const rv = calcReceitasVar(todasReceitasVar.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       const f = calcFixas(todasFixas.map(x => ({ ...x, dataInicio: new Date(x.dataInicio), dataProximoVencimento: x.dataProximoVencimento ? new Date(x.dataProximoVencimento) : null })), m, a);
-      const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a, false);
+      const v = calcVariaveis(todasVariaveis.map(x => ({ ...x, dataInicio: new Date(x.dataInicio) })), m, a);
       saldoEfetivo += r + rv - f - v;
       m++;
       if (m > 12) { m = 1; a++; }
@@ -167,7 +166,6 @@ export async function GET(req: NextRequest) {
       (ano - d.dataInicio.getUTCFullYear()) * 12 + (mes - 1 - d.dataInicio.getUTCMonth());
     const parcelaAtualCalc = d.parcelaAtual + diffMeses;
     if (parcelaAtualCalc < d.parcelaAtual || parcelaAtualCalc > d.parcelasTotal) return false;
-    if (d.confirmadaAte && d.confirmadaAte.getUTCFullYear() === ano && d.confirmadaAte.getUTCMonth() + 1 === mes) return false;
     return true;
   });
   const categoriasVariaveis = groupByCategoria(
