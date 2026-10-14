@@ -20,6 +20,7 @@ import {
   X,
   Route,
   Scissors,
+  HandCoins,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useLancador } from "@/components/lancar/LancadorGlobal";
@@ -46,6 +47,7 @@ const grupos = [
     itens: [
       { href: "/despesas-fixas", label: "Contas do mês", icon: Repeat },
       { href: "/despesas-variaveis", label: "Cartões e parcelas", icon: CreditCard },
+      { href: "/emprestimos", label: "Empréstimos", icon: HandCoins },
     ],
   },
   {
