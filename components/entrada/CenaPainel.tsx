@@ -165,7 +165,7 @@ export function CenaPainel() {
       </div>
 
       {/* cartões soltos na frente */}
-      <div className="entrada-flutua absolute -left-12 -bottom-8rounded-2xl bg-white ring-1 ring-[#e3e8e2] shadow-[0_24px_48px_-24px_rgba(22,27,24,0.35)] px-4 py-3 w-[230px]">
+      <div className="entrada-flutua absolute -left-12 -bottom-8 rounded-2xl bg-white ring-1 ring-[#e3e8e2] shadow-[0_24px_48px_-24px_rgba(22,27,24,0.35)] px-4 py-3 w-[230px]">
         <p className="text-[11.5px] text-[#5f6861]">Vence sexta, 14/11</p>
         <div className="flex items-baseline justify-between mt-0.5">
           <p className="text-[14px] font-semibold text-[#161b18]">Conta de luz</p>
