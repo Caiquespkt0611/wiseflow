@@ -151,6 +151,15 @@ body {
     @apply w-full bg-superficie border border-tinta-200 rounded-lg px-3 py-2.5 text-base sm:text-sm text-tinta-900 placeholder:text-tinta-400;
     @apply focus:outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-500/20;
   }
+  /* O Chrome pinta de azul o campo que ele preenche sozinho; aqui fica na cor do campo. */
+  .campo:-webkit-autofill,
+  .campo:-webkit-autofill:hover,
+  .campo:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgb(var(--tinta-900));
+    -webkit-box-shadow: 0 0 0 1000px rgb(var(--superficie)) inset;
+    caret-color: rgb(var(--tinta-900));
+    transition: background-color 9999s ease-out 0s;
+  }
   .campo-rotulo {
     @apply block text-sm font-medium text-tinta-700 mb-1.5;
   }
@@ -167,4 +176,84 @@ body {
   .pb-mobile-content {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* ======================================================================
+ * Entrada (login), 12/11/2026: no padrão do site da InnovAdapt (fundo claro,
+ * brilhos e linhas de luz, produto na tela), nas cores verdes do WiseFlow.
+ * Sempre clara, mesmo com o celular no escuro.
+ * ==================================================================== */
+.tema-claro {
+  --superficie: 255 255 255;
+  --tinta-50: 244 245 242; --tinta-100: 236 238 234; --tinta-200: 223 226 221; --tinta-300: 201 206 199;
+  --tinta-400: 115 124 116; --tinta-500: 95 104 97; --tinta-600: 74 82 76; --tinta-700: 54 61 56;
+  --tinta-800: 35 41 37; --tinta-900: 22 27 24;
+  --marca-50: 238 245 241; --marca-100: 214 233 222; --marca-200: 169 209 186; --marca-300: 116 178 144;
+  --marca-400: 63 143 104; --marca-500: 31 122 82; --marca-600: 23 102 63; --marca-700: 17 81 47;
+  --marca-800: 12 61 35; --marca-900: 8 42 24; --marca-acao: 23 102 63; --marca-acao-forte: 17 81 47;
+  --saida-50: 251 239 236; --saida-600: 162 61 40; --saida-700: 132 48 31;
+  color-scheme: light;
+}
+.entrada-fundo { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.entrada-orbe { position: absolute; border-radius: 50%; will-change: transform; }
+.entrada-linhas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.entrada-linhas path { fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 6 14; }
+
+.entrada-degrade {
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+  background: linear-gradient(100deg, #17663f, #1f9a62 55%, #0da2b8);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.entrada-cartao {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e3e8e2;
+  border-radius: 24px;
+  box-shadow: 0 1px 2px rgba(22, 27, 24, 0.04), 0 30px 60px -36px rgba(23, 102, 63, 0.4);
+}
+.entrada-campo { padding-top: 0.75rem; padding-bottom: 0.75rem; border-radius: 0.75rem; background: #fbfcfa; }
+.entrada-botao {
+  background: linear-gradient(180deg, #1f7a52, #17663f);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 10px 24px -10px rgba(23, 102, 63, 0.7);
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, filter 140ms ease-out;
+}
+.entrada-botao:hover { filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 14px 30px -10px rgba(23, 102, 63, 0.8); }
+.entrada-botao:active { transform: scale(0.98); }
+
+.entrada-cena { perspective: 1800px; }
+.entrada-giro { transform: rotateY(-10deg) rotateX(6deg); transform-style: preserve-3d; transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .entrada-orbe { animation: entrada-vagar 14s ease-in-out infinite alternate; }
+  .entrada-linhas path { animation: entrada-correr 20s linear infinite; }
+  .entrada-linhas path:nth-of-type(2) { animation-duration: 26s; }
+  .entrada-linhas path:nth-of-type(3) { animation-duration: 32s; }
+  .entrada-degrade { animation: entrada-andar 6s ease-in-out infinite alternate; }
+
+  .entrada-palavra { display: inline-block; animation: entrada-palavra 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--p) * 60ms); }
+  .entrada-depois { animation: entrada-subir 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--d); }
+  .entrada-sobe { animation: entrada-painel 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+  .entrada-barra { animation: entrada-crescer 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom; }
+  .entrada-trilho { animation: entrada-esticar 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: left; }
+  .entrada-flutua { animation: entrada-subir 1s cubic-bezier(0.22, 1, 0.36, 1) 0.9s both, entrada-boia 6s ease-in-out 2s infinite; }
+  .entrada-flutua-2 { animation: entrada-subir 1s cubic-bezier(0.22, 1, 0.36, 1) 1.1s both, entrada-boia 6s ease-in-out -3s infinite; }
+}
+@keyframes entrada-vagar { to { transform: translate(70px, 50px) scale(1.12); } }
+@keyframes entrada-correr { to { stroke-dashoffset: -400; } }
+@keyframes entrada-andar { to { background-position: 100% 0; } }
+@keyframes entrada-palavra { from { opacity: 0; filter: blur(10px); translate: 0 0.3em; } }
+@keyframes entrada-subir { from { opacity: 0; translate: 0 24px; } }
+@keyframes entrada-painel { from { opacity: 0; translate: 0 80px; } }
+@keyframes entrada-crescer { from { transform: scaleY(0); } }
+@keyframes entrada-esticar { from { transform: scaleX(0); } }
+@keyframes entrada-boia { 50% { translate: 0 -10px; } }
+
+/* Celular: sem desfoque animado e sem movimento infinito (fica lento). */
+@media (max-width: 767px) {
+  .entrada-orbe, .entrada-linhas path, .entrada-degrade { animation: none !important; }
+  .entrada-palavra { animation-name: entrada-subir !important; animation-duration: 0.6s !important; animation-delay: calc(var(--p) * 35ms) !important; }
+  .entrada-depois { animation-duration: 0.45s !important; animation-delay: 0.3s !important; }
 }
